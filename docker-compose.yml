@@ -1,0 +1,58 @@
+# HydraSmart API — banco de dados e API em containers.
+#
+# Na máquina local (feira):  docker compose up -d db      -> só o PostgreSQL; a API roda com `npm run dev`
+#                            (a API precisa rodar fora do Docker para acessar a porta USB do Arduino no Windows)
+# Na VPS:                    docker compose up -d --build -> PostgreSQL + API
+#
+# A rede "hydrasmart" é compartilhada com o repositório HydraSmartFront (nginx faz proxy para a API).
+
+name: hydrasmart-api
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-hydrasmart}
+      POSTGRES_USER: ${POSTGRES_USER:-hydrasmart}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hydrasmart}
+      TZ: America/Cuiaba
+    ports:
+      # Exposto só para a própria máquina (127.0.0.1), nunca para a internet.
+      - "127.0.0.1:${DB_PORT:-5433}:5432"
+    volumes:
+      - dados_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [hydrasmart]
+
+  api:
+    build: .
+    image: hydrasmart-api:latest
+    restart: unless-stopped
+    profiles: [completo]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3333
+      DATABASE_URL: postgres://${POSTGRES_USER:-hydrasmart}:${POSTGRES_PASSWORD:-hydrasmart}@db:5432/${POSTGRES_DB:-hydrasmart}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
+      SERIAL_ENABLED: "false"
+      INGEST_API_KEY: ${INGEST_API_KEY:-}
+      CEMADEN_JWT_TOKEN: ${CEMADEN_JWT_TOKEN:-}
+      TZ: America/Cuiaba
+    ports:
+      - "127.0.0.1:${API_PORT:-3333}:3333"
+    networks: [hydrasmart]
+
+volumes:
+  dados_postgres:
+
+networks:
+  hydrasmart:
+    name: hydrasmart

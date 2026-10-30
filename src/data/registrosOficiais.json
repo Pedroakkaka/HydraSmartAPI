@@ -1,0 +1,79 @@
+[
+  {
+    "id": "REG-2024-001",
+    "data": "10/02/2024 - 11/02/2024",
+    "titulo": "Decreto de Situação de Emergência nº 140/2024 (Temporal Histórico)",
+    "municipio": "Cáceres - MT",
+    "bairrosAfetados": [
+      "Cavalhada",
+      "Vila Irene",
+      "Santos Dumont",
+      "DNER",
+      "Maracanãzinha",
+      "Centro Histórico"
+    ],
+    "tipoOcorrencia": "Enxurrada e Alagamento Urbano por Chuva Extrema",
+    "classificacaoCobrade": "1.2.1.0.0 — Inundações bruscas / Enxurradas",
+    "orgaoResponsavel": "Defesa Civil Municipal de Cáceres / Gabinete da Prefeita",
+    "precipitacaoEstimada": "> 120 mm a 200 mm em menos de 24 horas",
+    "descricaoOficial": "Precipitação pluviométrica torrencial de intensidade incomum provocou o estrangulamento da vazão dos córregos Sangradouro e Lavapés, gerando refluxo nas galerias pluviais e inundando mais de 7.000 residências e estabelecimentos comerciais.",
+    "fonteDocumental": "Diário Oficial dos Municípios do Estado de Mato Grosso / Decreto Municipal nº 140/2024",
+    "linkConsulta": "https://www.caceres.mt.gov.br/",
+    "limitacoesRegistro": "Dados quantitativos baseados em laudos periciais da Defesa Civil e medições manuais de campo; não havia rede automatizada de sensores ultrassônicos em bueiros na data do evento."
+  },
+  {
+    "id": "REG-ANA-66070004",
+    "data": "Série Histórica Oficial (1965 - Presente)",
+    "titulo": "Estação Fluviométrica 66070004 — Rio Paraguai (Cáceres)",
+    "municipio": "Cáceres - MT",
+    "bairrosAfetados": [
+      "Centro Histórico (Cais da Praça Barão)",
+      "Orla Fluvial"
+    ],
+    "tipoOcorrencia": "Monitoramento Contínuo da Cota do Rio Paraguai",
+    "classificacaoCobrade": "1.2.1.0.0 — Inundação Gradual / Cheia Pantaneira",
+    "orgaoResponsavel": "Agência Nacional de Águas e Saneamento Básico (ANA) / CPRM / Marinha do Brasil",
+    "precipitacaoEstimada": "Cotas Oficiais: Alerta a 5,40 m | Transbordo a 5,80 m | Recorde Histórico: 6,24 m (1995)",
+    "descricaoOficial": "Estação de referência hidrológica internacional para a Bacia do Alto Paraguai. O transbordo do rio bloqueia o deságue natural das galerias pluviais urbanas dos córregos Sangradouro e Lavapés por efeito de remanso hidráulico.",
+    "fonteDocumental": "Rede Hidrometeorológica Nacional / Sistema HidroWeb (ANA)",
+    "linkConsulta": "https://snirh.gov.br/hidroweb/",
+    "limitacoesRegistro": "A estação monitora a dinâmica macrorregional do Rio Paraguai, não mensurando o acúmulo imediato de água da chuva nos bueiros e vias internas da malha urbana."
+  },
+  {
+    "id": "REG-CPRM-RISCO-2018",
+    "data": "Mapeamento Técnico de Riscos Hidrológicos e Geológicos",
+    "titulo": "Setorização de Áreas de Risco Geológico e Hidrológico de Cáceres",
+    "municipio": "Cáceres - MT",
+    "bairrosAfetados": [
+      "Cavalhada (Setor Sangradouro)",
+      "DNER",
+      "Vila Irene",
+      "Cohab Nova"
+    ],
+    "tipoOcorrencia": "Mapeamento Cartográfico Setorial de Risco R3 (Alto) e R4 (Muito Alto)",
+    "classificacaoCobrade": "Mapeamento Preventivo de Riscos de Desastres Naturais",
+    "orgaoResponsavel": "Serviço Geológico do Brasil (SGB / CPRM) & Defesa Civil Nacional",
+    "precipitacaoEstimada": "Áreas sujeitas a inundação periódica e enxurrada de baixa permeabilidade",
+    "descricaoOficial": "Levantamento cartográfico e topográfico das áreas críticas de drenagem de Cáceres, destacando o afunilamento de galerias sob pontes e a impermeabilização do solo no leito dos córregos urbanos.",
+    "fonteDocumental": "Repositório Institucional de Geociências (RIGEO - CPRM / SGB)",
+    "linkConsulta": "https://rigeo.cprm.gov.br/",
+    "limitacoesRegistro": "Trata-se de estudo cartográfico setorial permanente, sem integração telemétrica direta em tempo real de IoT."
+  },
+  {
+    "id": "REG-CEMADEN-AVISO",
+    "data": "Status da Consulta CEMADEN",
+    "titulo": "Monitoramento Nacional de Desastres Naturais (CEMADEN)",
+    "municipio": "Cáceres - MT",
+    "bairrosAfetados": [
+      "Bacia Urbana de Cáceres"
+    ],
+    "tipoOcorrencia": "Integração de Alertas Hidrometeorológicos",
+    "classificacaoCobrade": "Vigilância Contínua",
+    "orgaoResponsavel": "Centro Nacional de Monitoramento e Alertas de Desastres Naturais (CEMADEN / MCTI)",
+    "precipitacaoEstimada": "Limiar crítico municipal: Acumulado > 50 mm/24h",
+    "descricaoOficial": "Não foi possível obter endpoint de API pública REST aberta sem autenticação governamental direta para séries históricas brutas minuto a minuto do CEMADEN nesta sessão. Os limiares de risco do sistema seguem o Plano de Contingência da Defesa Civil Municipal de Cáceres.",
+    "fonteDocumental": "Portal de Alertas do CEMADEN",
+    "linkConsulta": "http://www2.cemaden.gov.br/",
+    "limitacoesRegistro": "Acesso a dados históricos detalhados requer credenciais institucionais ou convênio com o Sistema Integrado de Informações sobre Desastres (S2ID)."
+  }
+]
