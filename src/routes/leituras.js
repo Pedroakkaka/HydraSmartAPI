@@ -35,6 +35,35 @@ export default async function rotasLeituras(app, { ctx }) {
     });
   });
 
+  app.get('/leituras/serie', {
+    schema: {
+      tags: ['Leituras'],
+      summary: 'Série histórica agregada (média e máximo por intervalo) para gráficos',
+      querystring: {
+        type: 'object',
+        required: ['desde'],
+        properties: {
+          bueiroId: { type: 'string' },
+          desde: { type: 'string', format: 'date-time' },
+          ate: { type: 'string', format: 'date-time' },
+          intervaloSegundos: { type: 'integer', minimum: 10, maximum: 86400, default: 60 }
+        }
+      }
+    }
+  }, async (req, reply) => {
+    const { bueiroId, desde, ate, intervaloSegundos } = req.query;
+    const periodoMs = (ate ? new Date(ate) : new Date()) - new Date(desde);
+    if (periodoMs / 1000 / intervaloSegundos > 5000) {
+      return reply.code(400).send({ erro: 'Período longo demais para esse intervalo: aumente intervaloSegundos.' });
+    }
+    return ctx.repositorios.leituras.serie({
+      bueiroId: bueiroId ? normalizarBueiroId(bueiroId) : undefined,
+      desde,
+      ate,
+      intervaloSegundos
+    });
+  });
+
   app.post('/leituras', {
     schema: {
       tags: ['Leituras'],

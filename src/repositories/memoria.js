@@ -63,6 +63,27 @@ export function criarRepositoriosMemoria() {
         .sort((a, b) => (ordem === 'asc' ? a.registradoEm - b.registradoEm : b.registradoEm - a.registradoEm));
       return clonar(filtradas.slice(0, limite)).map(({ timestamp: _t, ...resto }) => resto);
     },
+    async serie({ bueiroId, desde, ate, intervaloSegundos }) {
+      const passo = intervaloSegundos * 1000;
+      const baldes = new Map();
+      for (const l of tabelaLeituras) {
+        if ((bueiroId && l.bueiroId !== bueiroId) || !noPeriodo(l.registradoEm, desde, ate)) continue;
+        const inicio = Math.floor(l.registradoEm.getTime() / passo) * passo;
+        const chave = `${l.bueiroId}|${inicio}`;
+        if (!baldes.has(chave)) baldes.set(chave, { bueiroId: l.bueiroId, inicio, niveis: [] });
+        baldes.get(chave).niveis.push(l.nivelPct);
+      }
+      return [...baldes.values()]
+        .sort((a, b) => a.inicio - b.inicio || a.bueiroId.localeCompare(b.bueiroId))
+        .map((b) => ({
+          bueiroId: b.bueiroId,
+          inicio: new Date(b.inicio),
+          nivelMedioPct: Math.round((b.niveis.reduce((s, n) => s + n, 0) / b.niveis.length) * 10) / 10,
+          nivelMaximoPct: Math.max(...b.niveis),
+          totalLeituras: b.niveis.length
+        }));
+    },
+
     async estatisticas({ desde, ate } = {}) {
       const grupos = new Map();
       for (const l of tabelaLeituras) {

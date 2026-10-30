@@ -103,6 +103,32 @@ export function criarRepositoriosPostgres(pool) {
       return rows.map(mapLeitura);
     },
 
+    /**
+     * Série agregada por intervalo fixo (ex.: média a cada 60 s), para gráficos de períodos longos.
+     */
+    async serie({ bueiroId, desde, ate, intervaloSegundos }) {
+      const { rows } = await pool.query(
+        `SELECT bueiro_id,
+                to_timestamp(floor(extract(epoch FROM registrado_em) / $4) * $4) AS inicio,
+                ROUND(AVG(nivel_pct), 1) AS media,
+                MAX(nivel_pct) AS maximo,
+                COUNT(*)::int AS total
+         FROM leituras
+         WHERE registrado_em >= $2 AND ($3::timestamptz IS NULL OR registrado_em <= $3)
+           AND ($1::text IS NULL OR bueiro_id = $1)
+         GROUP BY bueiro_id, inicio
+         ORDER BY inicio, bueiro_id`,
+        [bueiroId ?? null, desde, ate ?? null, intervaloSegundos]
+      );
+      return rows.map((r) => ({
+        bueiroId: r.bueiro_id,
+        inicio: r.inicio,
+        nivelMedioPct: r.media,
+        nivelMaximoPct: r.maximo,
+        totalLeituras: r.total
+      }));
+    },
+
     async estatisticas({ desde, ate } = {}) {
       const { rows } = await pool.query(
         `SELECT bueiro_id, COUNT(*)::int AS total, MIN(nivel_pct) AS minimo, MAX(nivel_pct) AS maximo,

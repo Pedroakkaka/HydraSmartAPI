@@ -138,6 +138,22 @@ test('relatório CSV traz cabeçalho e leituras', async () => {
   assert.equal(linhas.length, 2);
 });
 
+test('série histórica agrega leituras por intervalo', async () => {
+  await enviar({ bueiroId: 1, distanciaCm: 11 }); // 50%
+  await enviar({ bueiroId: 1, distanciaCm: 2 }); // 100%
+  await enviar({ bueiroId: 2, distanciaCm: 20 }); // 0%
+  const desde = new Date(Date.now() - 3600e3).toISOString();
+  const r = await app.inject(`/api/v1/leituras/serie?desde=${encodeURIComponent(desde)}&intervaloSegundos=3600`);
+  assert.equal(r.statusCode, 200);
+  const b1 = r.json().find((p) => p.bueiroId === 'bueiro_1');
+  assert.equal(b1.nivelMedioPct, 75);
+  assert.equal(b1.nivelMaximoPct, 100);
+  assert.equal(b1.totalLeituras, 2);
+
+  const excessivo = await app.inject(`/api/v1/leituras/serie?desde=2020-01-01T00:00:00Z&intervaloSegundos=10`);
+  assert.equal(excessivo.statusCode, 400);
+});
+
 test('rota inexistente devolve 404 em JSON', async () => {
   const r = await app.inject('/api/v1/nao-existe');
   assert.equal(r.statusCode, 404);
