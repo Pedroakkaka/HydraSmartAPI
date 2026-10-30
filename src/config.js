@@ -1,0 +1,51 @@
+/**
+ * Configuração centralizada, lida das variáveis de ambiente (.env em desenvolvimento,
+ * variáveis do container em produção). Nenhum segredo fica no código.
+ */
+
+const bool = (v, padrao) => (v === undefined || v === '' ? padrao : ['1', 'true', 'sim', 'yes'].includes(String(v).toLowerCase()));
+const int = (v, padrao) => (Number.isFinite(Number.parseInt(v, 10)) ? Number.parseInt(v, 10) : padrao);
+
+export function carregarConfig(env = process.env) {
+  const nodeEnv = env.NODE_ENV || 'development';
+  const producao = nodeEnv === 'production';
+
+  return {
+    nodeEnv,
+    producao,
+    host: env.HOST || '0.0.0.0',
+    port: int(env.PORT, 3333),
+    logLevel: env.LOG_LEVEL || (producao ? 'info' : 'debug'),
+
+    // Lista separada por vírgula. "*" libera qualquer origem (apenas para desenvolvimento).
+    corsOrigin: (env.CORS_ORIGIN || 'http://localhost:5173').split(',').map((s) => s.trim()).filter(Boolean),
+
+    banco: {
+      url: env.DATABASE_URL || 'postgres://hydrasmart:hydrasmart@localhost:5433/hydrasmart',
+      // Em desenvolvimento a API sobe mesmo sem banco (dados só em memória), para a demonstração não parar.
+      permitirFallbackMemoria: bool(env.DB_FALLBACK_MEMORIA, !producao)
+    },
+
+    serial: {
+      habilitada: bool(env.SERIAL_ENABLED, true),
+      // "auto" procura uma placa Arduino/CH340/FTDI; também aceita "COM3", "/dev/ttyUSB0"...
+      porta: env.SERIAL_PORT || 'auto',
+      baudRate: int(env.SERIAL_BAUD, 115200),
+      reconectarAutomaticamente: bool(env.SERIAL_AUTO_RECONNECT, true),
+      timeoutDadosObsoletosMs: int(env.SERIAL_STALE_MS, 8000)
+    },
+
+    // Chave exigida no POST /api/v1/leituras (sensores em campo enviando via HTTP).
+    ingestApiKey: env.INGEST_API_KEY || '',
+    cemadenToken: env.CEMADEN_JWT_TOKEN || env.CEMADEN_TOKEN || '',
+
+    municipio: {
+      nome: 'Cáceres - MT',
+      latitude: -16.0706,
+      longitude: -57.6789,
+      timezone: 'America/Cuiaba'
+    },
+
+    historicoMemoriaAmostras: 50
+  };
+}
