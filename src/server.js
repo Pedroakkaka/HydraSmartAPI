@@ -47,6 +47,10 @@ async function iniciar() {
   await app.listen({ host: config.host, port: config.port });
   log.info(`HydraSmart API em http://localhost:${config.port}  •  documentação: http://localhost:${config.port}/docs`);
 
+  // Pré-carrega dados externos lentos (mapa de drenos e clima) em segundo plano
+  ctx.osm.aquecer();
+  ctx.clima.obter().catch(() => {});
+
   // Serial não bloqueia a subida da API: se o Arduino não estiver plugado, tenta de novo sozinho.
   ctx.serial.iniciar().catch((err) => log.warn(`[serial] ${err.message}`));
 

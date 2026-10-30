@@ -9,27 +9,45 @@ const BBOX = '-16.12,-57.75,-16.02,-57.62';
 const CONSULTA = `[out:json][timeout:15];(node["manhole"](${BBOX});node["waterway"="drain"](${BBOX});way["waterway"="drain"](${BBOX}););out center 200;`;
 const SERVIDORES = [
   'https://overpass-api.de/api/interpreter',
-  'https://overpass.kumi.systems/api/interpreter'
+  'https://overpass.private.coffee/api/interpreter',
+  'https://maps.mail.ru/osm/tools/overpass/api/interpreter'
 ];
+const TIMEOUT_POR_SERVIDOR_MS = 10_000;
+// Após uma falha geral, espera este tempo antes de tentar de novo (não trava o painel a cada acesso).
+const ESPERA_APOS_FALHA_MS = 5 * 60 * 1000;
 
 export class OsmService {
   constructor({ log, ttlMs = 6 * 60 * 60 * 1000 }) {
     this.log = log;
     this.cache = new CacheTtl(ttlMs);
+    this.falhaRecente = null; // { ate: timestamp, resposta }
+  }
+
+  /** Consulta em segundo plano na inicialização, para o mapa abrir rápido. */
+  aquecer() {
+    this.obterDrenos().catch(() => {});
   }
 
   async obterDrenos({ forcar = false } = {}) {
+    if (!forcar && !this.cache.valido() && this.falhaRecente && Date.now() < this.falhaRecente.ate) {
+      return this.falhaRecente.resposta;
+    }
     try {
-      return await this.cache.obter(() => this._consultar(), { forcar });
+      const resultado = await this.cache.obter(() => this._consultar(), { forcar });
+      this.falhaRecente = null;
+      return resultado;
     } catch (err) {
       this.log.warn(`[osm] Overpass indisponível: ${err.message}`);
-      if (this.cache.valor) return { ...this.cache.valor, status: 'desatualizado' };
-      return {
-        status: 'indisponivel',
-        mensagem: 'Overpass API/OSM temporariamente indisponível. A drenagem exibida baseia-se nos sensores do protótipo.',
-        elementos: [],
-        consultadoEm: new Date().toISOString()
-      };
+      const resposta = this.cache.valor
+        ? { ...this.cache.valor, status: 'desatualizado' }
+        : {
+          status: 'indisponivel',
+          mensagem: 'Overpass API/OSM temporariamente indisponível. A drenagem exibida baseia-se nos sensores do protótipo.',
+          elementos: [],
+          consultadoEm: new Date().toISOString()
+        };
+      this.falhaRecente = { ate: Date.now() + ESPERA_APOS_FALHA_MS, resposta };
+      return resposta;
     }
   }
 
@@ -41,7 +59,7 @@ export class OsmService {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'HydraSmart-API/3.0' },
           body: new URLSearchParams({ data: CONSULTA }),
-          signal: AbortSignal.timeout(15_000)
+          signal: AbortSignal.timeout(TIMEOUT_POR_SERVIDOR_MS)
         });
         if (!resp.ok) throw new Error(`HTTP ${resp.status} em ${servidor}`);
         const data = await resp.json();
