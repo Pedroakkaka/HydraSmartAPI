@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>HydraSmart — Guia de Instalação</title>
+<style>
+  @page { size: A4; margin: 16mm 15mm 18mm 15mm; }
+  :root {
+    --navy: #0b1426;
+    --cyan: #0891b2;
+    --cyan-claro: #e0f7fb;
+    --ambar: #b45309;
+    --ambar-claro: #fff7e6;
+    --vermelho: #b91c1c;
+    --verde: #047857;
+    --verde-claro: #e7f8f1;
+    --cinza: #475569;
+    --linha: #dbe2ea;
+    --fundo: #f6f8fb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    color: #1e293b;
+    font-size: 10.5pt;
+    line-height: 1.5;
+    margin: 0;
+  }
+  h1, h2, h3 { color: var(--navy); line-height: 1.25; }
+  h2 {
+    font-size: 15pt;
+    margin: 0 0 8px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid var(--cyan);
+    break-after: avoid;
+  }
+  h3 { font-size: 11.5pt; margin: 14px 0 6px; break-after: avoid; }
+  p { margin: 6px 0; }
+  a { color: var(--cyan); text-decoration: none; word-break: break-all; }
+  code, .mono { font-family: Consolas, "Cascadia Mono", monospace; font-size: 9.5pt; }
+  code { background: #eef2f6; padding: 1px 5px; border-radius: 4px; color: #0f3a52; }
+  pre {
+    background: var(--navy);
+    color: #e2f3f8;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-family: Consolas, "Cascadia Mono", monospace;
+    font-size: 9.5pt;
+    white-space: pre-wrap;
+    margin: 8px 0;
+    break-inside: avoid;
+  }
+  pre .com { color: #7dd3fc; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 9.5pt; break-inside: auto; }
+  table.inteira { break-inside: avoid; }
+  th { background: var(--navy); color: #fff; text-align: left; padding: 6px 8px; font-weight: 600; }
+  td { padding: 6px 8px; border-bottom: 1px solid var(--linha); vertical-align: top; }
+  tr { break-inside: avoid; }
+  tr:nth-child(even) td { background: var(--fundo); }
+  ul, ol { margin: 6px 0; padding-left: 20px; }
+  li { margin: 3px 0; }
+
+  /* Capa */
+  .capa {
+    background: linear-gradient(135deg, #0b1426 0%, #0f2a44 60%, #0e4a5c 100%);
+    color: #fff;
+    border-radius: 14px;
+    padding: 24px 28px 20px;
+    margin-bottom: 18px;
+  }
+  .marca { display: flex; align-items: center; gap: 12px; }
+  .logo {
+    width: 46px; height: 46px; border-radius: 12px;
+    background: rgba(0, 212, 229, 0.15); border: 1px solid rgba(0, 212, 229, 0.5);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .capa .nome { font-size: 24pt; font-weight: 800; letter-spacing: -0.5px; }
+  .capa .sub { color: #7dd3fc; font-size: 10pt; }
+  .capa h1 { color: #fff; font-size: 19pt; margin: 14px 0 4px; }
+  .capa p { color: #cbd5e1; font-size: 11pt; margin: 0; }
+  .capa .meta { margin-top: 10px; font-size: 9pt; color: #94a3b8; }
+
+  /* Resumo em 3 passos */
+  .resumo { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0 18px; }
+  .resumo div {
+    border: 1px solid var(--linha); border-radius: 10px; padding: 10px 12px; background: var(--fundo);
+  }
+  .resumo b { display: block; color: var(--cyan); font-size: 9pt; text-transform: uppercase; letter-spacing: 0.5px; }
+  .resumo span { font-size: 10pt; }
+
+  /* Cartões dos passos */
+  .passo {
+    border: 1px solid var(--linha);
+    border-left: 5px solid var(--cyan);
+    border-radius: 10px;
+    padding: 12px 16px 10px;
+    margin: 0 0 14px;
+    break-inside: avoid;
+  }
+  .passo-cab { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .num {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--cyan); color: #fff; font-weight: 800; font-size: 13pt;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .passo-cab h3 { margin: 0; font-size: 13pt; }
+  .passo-cab .tempo { margin-left: auto; font-size: 8.5pt; color: var(--cinza); background: var(--fundo); padding: 2px 8px; border-radius: 10px; }
+
+  .arquivo {
+    display: inline-block; font-family: Consolas, monospace; font-weight: 700; font-size: 10.5pt;
+    background: var(--cyan-claro); color: #075e74; border: 1px solid #a5e3ee; padding: 3px 10px; border-radius: 6px;
+  }
+
+  /* Caixas de destaque */
+  .nota, .alerta, .ok {
+    border-radius: 8px; padding: 8px 12px; margin: 8px 0; font-size: 9.5pt; break-inside: avoid;
+  }
+  .nota { background: var(--cyan-claro); border-left: 4px solid var(--cyan); }
+  .alerta { background: var(--ambar-claro); border-left: 4px solid var(--ambar); }
+  .ok { background: var(--verde-claro); border-left: 4px solid var(--verde); }
+
+  /* Checklist */
+  .check { list-style: none; padding-left: 0; }
+  .check li { padding-left: 26px; position: relative; margin: 6px 0; }
+  .check li::before {
+    content: ""; position: absolute; left: 0; top: 2px; width: 14px; height: 14px;
+    border: 2px solid var(--cyan); border-radius: 3px;
+  }
+
+  .arvore { background: var(--fundo); color: #1e293b; border: 1px solid var(--linha); }
+  .duas-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .secao { margin-top: 14px; }
+  .quebra { break-before: page; }
+  .rodape-final { margin-top: 18px; font-size: 8.5pt; color: var(--cinza); text-align: center; border-top: 1px solid var(--linha); padding-top: 8px; }
+  .sim { color: var(--verde); font-weight: 700; }
+  .nao { color: var(--vermelho); font-weight: 700; }
+</style>
+</head>
+<body>
+
+<!-- ======================== CAPA ======================== -->
+<div class="capa">
+  <div class="marca">
+    <div class="logo">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00d4e5" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+    </div>
+    <div>
+      <div class="nome">HydraSmart</div>
+      <div class="sub">Monitoramento de drenagem urbana • Cáceres-MT</div>
+    </div>
+  </div>
+  <h1>Guia de instalação em outro computador</h1>
+  <p>Como preparar qualquer notebook com Windows para rodar o sistema completo (banco de dados, API, painel e leitura do Arduino) e ligá-lo com dois cliques no dia da feira.</p>
+  <div class="meta">Versão do sistema: API v3.1.0 • Painel v3.0.1 &nbsp;|&nbsp; Repositórios: github.com/Pedroakkaka/HydraSmartAPI e HydraSmartFront</div>
+</div>
+
+<div class="resumo">
+  <div><b>1 · Instalar programas</b><span>Git, Node.js e Docker Desktop (uma vez)</span></div>
+  <div><b>2 · Instalar o sistema</b><span><code>git clone</code> + dois cliques em <strong>INSTALAR</strong></span></div>
+  <div><b>3 · Usar</b><span>Dois cliques em <strong>INICIAR</strong> e <strong>PARAR</strong></span></div>
+</div>
+
+<div class="alerta"><strong>Faça a instalação com antecedência e com internet.</strong> No dia da feira só é preciso ligar o sistema.</div>
+
+<!-- ======================== REQUISITOS ======================== -->
+<div class="secao">
+  <h2>O que o notebook precisa ter</h2>
+  <table class="inteira">
+    <tr><th style="width:30%">Item</th><th>Mínimo</th></tr>
+    <tr><td>Sistema</td><td>Windows 10 (22H2) ou Windows 11, 64 bits</td></tr>
+    <tr><td>Memória</td><td>8 GB de RAM (o Docker usa cerca de 2 GB)</td></tr>
+    <tr><td>Espaço livre</td><td>10 GB</td></tr>
+    <tr><td>Virtualização</td><td>Ativada na BIOS (quase todos os notebooks já vêm assim)</td></tr>
+    <tr><td>Porta USB</td><td>Para o cabo do Arduino</td></tr>
+  </table>
+  <div class="nota">Para conferir a virtualização: abra o <strong>Gerenciador de Tarefas → Desempenho → CPU</strong> e veja se "Virtualização" mostra <strong>Habilitado</strong>.</div>
+</div>
+
+<!-- ======================== PASSO 1 ======================== -->
+<div class="secao">
+  <h2>Instalação (uma vez por computador)</h2>
+
+  <div class="passo">
+    <div class="passo-cab"><div class="num">1</div><h3>Instalar os programas</h3><span class="tempo">~20 min</span></div>
+    <p>Instale nesta ordem, sempre aceitando as opções padrão:</p>
+    <ol>
+      <li><strong>Git</strong> — <a href="https://git-scm.com/download/win">git-scm.com/download/win</a></li>
+      <li><strong>Node.js (versão LTS)</strong> — <a href="https://nodejs.org">nodejs.org</a></li>
+      <li><strong>Docker Desktop</strong> — <a href="https://www.docker.com/products/docker-desktop">docker.com/products/docker-desktop</a>
+        <ul>
+          <li>Na instalação, deixe marcado <strong>"Use WSL 2"</strong>.</li>
+          <li><strong>Reinicie o computador</strong> quando ele pedir.</li>
+          <li>Abra o Docker Desktop uma vez, aceite os termos e espere aparecer <strong>"Engine running"</strong> no canto inferior esquerdo. O login pode ser pulado.</li>
+          <li>Recomendado: em <em>Settings → General</em>, marque <strong>"Start Docker Desktop when you sign in"</strong>.</li>
+        </ul>
+      </li>
+      <li><strong>Driver do Arduino</strong>, só se a placa for um modelo compatível com chip CH340 (os mais baratos): <a href="http://www.wch-ic.com/downloads/CH341SER_EXE.html">wch-ic.com/downloads/CH341SER_EXE.html</a></li>
+    </ol>
+    <div class="nota">Se o Docker reclamar de WSL: abra o <strong>PowerShell como administrador</strong>, rode <code>wsl --update</code> e reinicie.</div>
+  </div>
+
+  <div class="passo">
+    <div class="passo-cab"><div class="num">2</div><h3>Baixar o projeto</h3><span class="tempo">~1 min</span></div>
+    <ol>
+      <li>Crie a pasta <code>C:\HydraSmart</code>.</li>
+      <li>Clique com o botão direito dentro dela e escolha <strong>"Abrir no Terminal"</strong>.</li>
+      <li>Rode o comando:</li>
+    </ol>
+    <pre>git clone https://github.com/Pedroakkaka/HydraSmartAPI.git</pre>
+    <p>Se o GitHub pedir login, entre com uma conta que tenha acesso aos repositórios. O painel (HydraSmartFront) é baixado sozinho no próximo passo.</p>
+  </div>
+
+  <div class="passo">
+    <div class="passo-cab"><div class="num">3</div><h3>Instalar o sistema</h3><span class="tempo">1 a 5 min</span></div>
+    <p>Abra a pasta <code>C:\HydraSmart\HydraSmartAPI</code> e dê <strong>dois cliques</strong> em:</p>
+    <p style="text-align:center; margin:10px 0"><span class="arquivo">INSTALAR-HYDRASMART.bat</span></p>
+    <div class="duas-col">
+      <div>
+        <p style="margin-top:0">O instalador faz tudo sozinho:</p>
+        <ul>
+          <li>confere se Node, Git e Docker estão instalados;</li>
+          <li>baixa o painel (HydraSmartFront);</li>
+          <li>cria o arquivo de configuração <code>.env</code>;</li>
+          <li>instala as dependências;</li>
+          <li>liga o banco de dados e cria as tabelas;</li>
+          <li>gera o painel otimizado e roda os testes.</li>
+        </ul>
+      </div>
+      <div>
+        <p style="margin-top:0">Estrutura final das pastas:</p>
+        <pre class="arvore">C:\HydraSmart\
+├── HydraSmartAPI\    servidor, banco e
+│                     atalhos (.bat)
+└── HydraSmartFront\  painel</pre>
+      </div>
+    </div>
+    <div class="ok">No final deve aparecer <strong>"Instalação concluída!"</strong>.</div>
+    <div class="nota">Se o Windows mostrar "O Windows protegeu o computador", clique em <strong>Mais informações → Executar assim mesmo</strong>.</div>
+  </div>
+</div>
+
+<!-- ======================== USO ======================== -->
+<div class="secao">
+  <h2>Uso no dia a dia</h2>
+
+  <div class="passo">
+    <div class="passo-cab"><div class="num">4</div><h3>Ligar o sistema</h3><span class="tempo">~30 s</span></div>
+    <ol>
+      <li>Ligue o <strong>Arduino</strong> no USB.</li>
+      <li>Feche a <strong>IDE do Arduino</strong>, se estiver aberta. Ela prende a porta USB.</li>
+      <li>Dê <strong>dois cliques</strong> em <span class="arquivo">INICIAR-HYDRASMART.bat</span></li>
+    </ol>
+    <p>Em cerca de 30 segundos:</p>
+    <ul>
+      <li>abrem duas janelas, <strong>"HydraSmart API"</strong> e <strong>"HydraSmart Painel"</strong>. <strong>Não feche essas duas.</strong></li>
+      <li>o navegador abre sozinho em <strong>http://localhost:4173</strong>;</li>
+      <li>o servidor encontra o Arduino automaticamente e o indicador no menu lateral fica verde.</li>
+    </ul>
+    <div class="nota">Na primeira vez, o Firewall do Windows pode pedir permissão para o <strong>Node.js</strong>. Marque <strong>Redes privadas</strong> e clique em <strong>Permitir</strong>. Isso é necessário para mostrar o painel em outro aparelho.</div>
+    <h3>Mostrar o painel numa TV, tablet ou celular</h3>
+    <p>A janela do INICIAR mostra um endereço como <code>http://192.168.0.15:4173</code>. Abra esse endereço em qualquer aparelho <strong>conectado à mesma rede Wi-Fi</strong>. Todos atualizam em tempo real ao mesmo tempo.</p>
+  </div>
+
+  <div class="passo">
+    <div class="passo-cab"><div class="num">5</div><h3>Desligar</h3><span class="tempo">~5 s</span></div>
+    <p>Dê <strong>dois cliques</strong> em <span class="arquivo">PARAR-HYDRASMART.bat</span>. As leituras gravadas ficam salvas no banco.</p>
+  </div>
+
+  <h2 style="margin-top:20px">Checklist do dia da feira</h2>
+  <ul class="check">
+    <li>Notebook carregado e na tomada. <strong>Desative a suspensão</strong> em <em>Configurações → Sistema → Energia</em>.</li>
+    <li>Abrir o Docker Desktop e esperar "Engine running". Se a opção de iniciar com o Windows estiver marcada, ele abre sozinho.</li>
+    <li>Plugar o Arduino, com a IDE do Arduino fechada.</li>
+    <li>Dois cliques em <strong>INICIAR-HYDRASMART.bat</strong>.</li>
+    <li>Abrir a página <strong>Diagnóstico</strong> e conferir o autodiagnóstico: API, tempo real, banco e Arduino devem estar com ✔.</li>
+    <li>Testar o som (Diagnóstico → <strong>Testar sirene</strong>). O navegador só libera som depois do primeiro clique na página.</li>
+  </ul>
+  <div class="alerta"><strong>Plano B:</strong> se o Arduino falhar, clique em <strong>Modo Real → Trocar</strong> no menu lateral. O modo demonstração simula cenários de chuva e alagamento sem gravar nada no histórico.</div>
+
+  <h3 style="break-after:avoid">Sem internet no local?</h3>
+  <table class="inteira">
+    <tr><th style="width:50%">Funciona sem internet</th><th>Precisa de internet</th></tr>
+    <tr><td><span class="sim">✔</span> Leitura do Arduino, níveis e alertas</td><td><span class="nao">✖</span> Mapa (imagens do OpenStreetMap)</td></tr>
+    <tr><td><span class="sim">✔</span> Banco de dados, histórico e relatórios</td><td><span class="nao">✖</span> Clima (Open-Meteo)</td></tr>
+    <tr><td><span class="sim">✔</span> Gráficos e maquete 3D</td><td><span class="nao">✖</span> CEMADEN</td></tr>
+    <tr><td><span class="sim">✔</span> Modo demonstração</td><td><span class="nao">✖</span> Fontes do texto (o painel usa uma fonte padrão do Windows no lugar)</td></tr>
+  </table>
+  <div class="nota">Dica: o roteador do celular resolve. Ligue o notebook nele antes de iniciar o sistema.</div>
+</div>
+
+<!-- ======================== MANUTENÇÃO ======================== -->
+<div class="secao">
+  <h2>Atualizar para a versão mais nova</h2>
+  <p>Com o sistema desligado, abra o terminal em <code>C:\HydraSmart</code> e rode:</p>
+  <pre>cd HydraSmartAPI;   git pull;   cd ..
+cd HydraSmartFront; git pull;   cd ..</pre>
+  <p>Depois rode <strong>INSTALAR-HYDRASMART.bat</strong> de novo. Ele mantém o <code>.env</code> e os dados do banco.</p>
+
+  <div style="break-inside:avoid"><h2 style="margin-top:20px">Gravar o firmware no Arduino (só se for uma placa nova)</h2>
+  <ol>
+    <li>Instale a <strong>Arduino IDE</strong>: <a href="https://www.arduino.cc/en/software">arduino.cc/en/software</a></li>
+    <li>Abra <code>HydraSmartAPI\firmware\hydrasmart_firmware.ino</code>.</li>
+    <li>Em <strong>Ferramentas → Placa</strong>, escolha <strong>Arduino Uno</strong>. Em <strong>Ferramentas → Porta</strong>, escolha a porta COM do Arduino.</li>
+    <li>Clique em <strong>Carregar</strong> (seta →).</li>
+    <li><strong>Feche a IDE</strong> antes de iniciar o HydraSmart.</li>
+  </ol>
+  <table class="inteira">
+    <tr><th>Sensor HC-SR04</th><th>TRIG</th><th>ECHO</th><th>Alimentação</th></tr>
+    <tr><td>Bueiro 01 (entrada)</td><td class="mono">D9</td><td class="mono">D10</td><td rowspan="2" style="vertical-align:middle">VCC → 5V &nbsp;•&nbsp; GND → GND</td></tr>
+    <tr><td>Bueiro 02 (saída)</td><td class="mono">D6</td><td class="mono">D7</td></tr>
+  </table>
+
+  </div>
+
+  <h2 style="margin-top:20px">Problemas comuns</h2>
+  <table>
+    <tr><th style="width:32%">Sintoma</th><th>Solução</th></tr>
+    <tr><td>"Node.js não encontrado" logo após instalar</td><td>Feche e abra a janela de novo, ou reinicie o computador.</td></tr>
+    <tr><td>Docker Desktop não abre ou fica em "Starting"</td><td>Confira a virtualização na BIOS. Rode <code>wsl --update</code> no PowerShell como administrador e reinicie.</td></tr>
+    <tr><td>"Porta ocupada" ao iniciar o banco</td><td>Outro programa usa a porta 5433. No arquivo <code>.env</code>, troque <code>DB_PORT=5434</code> e a porta em <code>DATABASE_URL</code> para 5434.</td></tr>
+    <tr><td>Arduino não é encontrado</td><td>Feche a IDE do Arduino. Troque o cabo (alguns só carregam e não transmitem dados). Instale o driver CH340. Com mais de uma placa, defina <code>SERIAL_PORT=COM4</code> (a porta certa) no <code>.env</code>.</td></tr>
+    <tr><td>Bueiros "Desatualizado"</td><td>O Arduino parou de enviar dados. Confira o cabo. A API reconecta sozinha a cada 5 segundos.</td></tr>
+    <tr><td>Painel mostra "Servidor indisponível"</td><td>A janela "HydraSmart API" foi fechada ou mostra um erro. Rode PARAR e depois INICIAR.</td></tr>
+    <tr><td>Outro aparelho não abre o painel</td><td>Os dois precisam estar no mesmo Wi-Fi, e o Firewall precisa permitir o Node.js em "Redes privadas".</td></tr>
+    <tr><td>Banco aparece como "memória" no Diagnóstico</td><td>O Docker não estava ligado quando a API subiu, e os dados não serão salvos. Abra o Docker, rode PARAR e depois INICIAR.</td></tr>
+  </table>
+
+  <h3>Endereços úteis</h3>
+  <table class="inteira">
+    <tr><th style="width:40%">Endereço</th><th>O que é</th></tr>
+    <tr><td class="mono">http://localhost:4173</td><td>Painel do HydraSmart</td></tr>
+    <tr><td class="mono">http://localhost:3333/docs</td><td>Documentação técnica da API (Swagger)</td></tr>
+    <tr><td class="mono">http://localhost:3333/api/v1/health</td><td>Verificação rápida de saúde da API</td></tr>
+  </table>
+</div>
+
+</body>
+</html>
