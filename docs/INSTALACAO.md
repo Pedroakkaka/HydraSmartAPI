@@ -1,5 +1,7 @@
 # Como instalar o HydraSmart em outro computador
 
+> 📄 **Versão para imprimir:** [Guia-Instalacao-HydraSmart.pdf](Guia-Instalacao-HydraSmart.pdf). Ela é gerada a partir de `docs/fonte/guia-instalacao.html`: abra o HTML no Chrome, pressione Ctrl+P e escolha Salvar como PDF.
+
 Este guia prepara qualquer notebook com Windows 10 ou 11 para rodar o HydraSmart completo: banco de dados, API, painel e leitura do Arduino. Depois da preparação, ligar o sistema é **um clique duplo**.
 
 > Faça a instalação **com antecedência e com internet**. No dia da feira só é preciso ligar o sistema.
