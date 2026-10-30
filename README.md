@@ -35,7 +35,17 @@ A API lê os sensores do Arduino pela USB, calcula o nível de água de cada bue
 - Se o PostgreSQL não responder **em desenvolvimento**, a API sobe com dados só em memória e avisa no log, para a apresentação não parar. Em produção ela não sobe sem banco.
 - Se o cabo USB for desconectado, a API tenta reconectar sozinha a cada 5 s.
 
-## Como rodar na máquina local (feira)
+## Instalar em outro computador (notebook da feira)
+
+Siga o passo a passo em **[docs/INSTALACAO.md](docs/INSTALACAO.md)**. Depois de instalar Git, Node.js e Docker Desktop, tudo se resolve com três atalhos na raiz deste repositório:
+
+| Arquivo | Quando usar |
+|---|---|
+| `INSTALAR-HYDRASMART.bat` | Uma vez por computador. Baixa o painel, instala tudo, cria o banco e roda os testes |
+| `INICIAR-HYDRASMART.bat` | Liga banco, API e painel e abre o navegador |
+| `PARAR-HYDRASMART.bat` | Desliga tudo. Os dados ficam salvos |
+
+## Como rodar manualmente (desenvolvimento)
 
 Pré-requisitos: **Node.js 20+** e **Docker Desktop** aberto.
 
