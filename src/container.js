@@ -32,7 +32,7 @@ export async function criarContexto({ config, repositorios, log }) {
   const simulador = new Simulator({ estado, ingest, alertas, log });
   const serial = new SerialReader({ estado, ingest, config: config.serial, log });
   const clima = new WeatherService({ municipio: config.municipio, log });
-  const cemaden = new CemadenService({ token: config.cemadenToken, log });
+  const cemaden = new CemadenService({ token: config.cemadenToken, email: config.cemadenEmail, senha: config.cemadenSenha, log });
   const osm = new OsmService({ log });
   const bocasLobo = new BocasLoboService({ log });
   const relatorios = new ReportService({ repositorios, estado });
