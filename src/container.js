@@ -10,6 +10,7 @@ import { Simulator } from './services/simulator.js';
 import { WeatherService } from './services/weatherService.js';
 import { CemadenService } from './services/cemadenService.js';
 import { OsmService } from './services/osmService.js';
+import { BocasLoboService } from './services/bocasLoboService.js';
 import { ReportService } from './services/reportService.js';
 import { SerialReader } from './serial/serialReader.js';
 import { sanitizarParametros, normalizarBueiroId } from './core/calibration.js';
@@ -33,6 +34,7 @@ export async function criarContexto({ config, repositorios, log }) {
   const clima = new WeatherService({ municipio: config.municipio, log });
   const cemaden = new CemadenService({ token: config.cemadenToken, log });
   const osm = new OsmService({ log });
+  const bocasLobo = new BocasLoboService({ log });
   const relatorios = new ReportService({ repositorios, estado });
 
   // Sinaliza bueiros sem leitura recente (vale para USB e para dispositivos HTTP).
@@ -90,6 +92,7 @@ export async function criarContexto({ config, repositorios, log }) {
     clima,
     cemaden,
     osm,
+    bocasLobo,
     relatorios,
     calibracao,
 
