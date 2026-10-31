@@ -15,18 +15,18 @@ const queryForcar = {
 
 export default async function rotasExternas(app, { ctx }) {
   app.get('/clima', {
-    schema: { tags: ['Fontes externas'], summary: 'Clima atual e previsão (Open-Meteo) para Cáceres-MT', querystring: queryForcar }
+    schema: { tags: ['Fontes externas'], summary: 'Clima atual e previsão (Open-Meteo) para Porto Alegre-RS', querystring: queryForcar }
   }, async (req) => ctx.clima.obter({ forcar: req.query.forcar }));
 
   app.get('/cemaden', {
-    schema: { tags: ['Fontes externas'], summary: 'Dados da estação CEMADEN de Cáceres', querystring: queryForcar }
+    schema: { tags: ['Fontes externas'], summary: 'Dados da integração CEMADEN (estação ainda configurada para Cáceres)', querystring: queryForcar }
   }, async (req) => ctx.cemaden.obter({ forcar: req.query.forcar }));
 
   app.get('/osm/drenos', {
-    schema: { tags: ['Fontes externas'], summary: 'Bueiros e drenos de Cáceres mapeados no OpenStreetMap', querystring: queryForcar }
+    schema: { tags: ['Fontes externas'], summary: 'Bueiros e drenos de Porto Alegre mapeados no OpenStreetMap', querystring: queryForcar }
   }, async (req) => ctx.osm.obterDrenos({ forcar: req.query.forcar }));
 
   app.get('/historico-oficial', {
-    schema: { tags: ['Fontes externas'], summary: 'Registros oficiais verificáveis de inundações em Cáceres' }
+    schema: { tags: ['Fontes externas'], summary: 'Registros históricos existentes (ainda referentes a Cáceres; não usar como histórico de Porto Alegre)' }
   }, async () => registrosOficiais);
 }
