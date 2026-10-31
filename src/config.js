@@ -40,10 +40,10 @@ export function carregarConfig(env = process.env) {
     cemadenToken: env.CEMADEN_JWT_TOKEN || env.CEMADEN_TOKEN || '',
 
     municipio: {
-      nome: 'Cáceres - MT',
-      latitude: -16.0706,
-      longitude: -57.6789,
-      timezone: 'America/Cuiaba'
+      nome: env.MUNICIPIO_NOME || 'Porto Alegre - RS',
+      latitude: Number(env.MUNICIPIO_LATITUDE ?? -30.0346),
+      longitude: Number(env.MUNICIPIO_LONGITUDE ?? -51.2177),
+      timezone: env.MUNICIPIO_TIMEZONE || 'America/Sao_Paulo'
     },
 
     historicoMemoriaAmostras: 50
