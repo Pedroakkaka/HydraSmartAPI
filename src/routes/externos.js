@@ -22,6 +22,10 @@ export default async function rotasExternas(app, { ctx }) {
     schema: { tags: ['Fontes externas'], summary: 'Dados da integração CEMADEN (estação ainda configurada para Cáceres)', querystring: queryForcar }
   }, async (req) => ctx.cemaden.obter({ forcar: req.query.forcar }));
 
+  app.get('/bocas-de-lobo', {
+    schema: { tags: ['Fontes externas'], summary: 'Cadastro oficial de bocas de lobo de Porto Alegre (SMAMUS)', querystring: { type: 'object', properties: { bbox: { type: 'string' }, forcar: { type: 'boolean', default: false } } } }
+  }, async (req) => ctx.bocasLobo.obter({ bbox: req.query.bbox, forcar: req.query.forcar }));
+
   app.get('/osm/drenos', {
     schema: { tags: ['Fontes externas'], summary: 'Bueiros e drenos de Porto Alegre mapeados no OpenStreetMap', querystring: queryForcar }
   }, async (req) => ctx.osm.obterDrenos({ forcar: req.query.forcar }));
