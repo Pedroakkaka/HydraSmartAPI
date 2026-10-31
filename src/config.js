@@ -38,6 +38,8 @@ export function carregarConfig(env = process.env) {
     // Chave exigida no POST /api/v1/leituras (sensores em campo enviando via HTTP).
     ingestApiKey: env.INGEST_API_KEY || '',
     cemadenToken: env.CEMADEN_JWT_TOKEN || env.CEMADEN_TOKEN || '',
+    cemadenEmail: env.CEMADEN_EMAIL || '',
+    cemadenSenha: env.CEMADEN_PASSWORD || '',
 
     municipio: {
       nome: env.MUNICIPIO_NOME || 'Porto Alegre - RS',
