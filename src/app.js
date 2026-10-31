@@ -42,7 +42,7 @@ export async function construirApp(ctx, { logger = false } = {}) {
     openapi: {
       info: {
         title: 'HydraSmart API',
-        description: 'Monitoramento de drenagem urbana e prevenção de alagamentos — Cáceres-MT. ' +
+        description: 'Monitoramento de drenagem urbana e prevenção de alagamentos — Porto Alegre-RS. ' +
           'Atualizações em tempo real pelo WebSocket em /ws.',
         version: '3.0.0'
       },
