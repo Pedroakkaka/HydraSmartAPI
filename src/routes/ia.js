@@ -24,10 +24,12 @@ export default async function rotasIA(app, { ctx }) {
     const { pergunta = 'Interprete as tendências observadas no histórico.', bueiroId, limite = 40 } = req.body || {};
     const leituras = await ctx.repositorios.leituras.listar({ ...(bueiroId ? { bueiroId } : {}), limite });
     const historico = Array.isArray(leituras) ? leituras : (leituras?.dados || leituras?.leituras || []);
+    if (!historico.length) return reply.code(200).send({ analise: 'Ainda não há leituras reais suficientes no histórico para interpretar tendências ou avaliar possíveis alagamentos. O Core continua responsável pelos alertas em tempo real.', natureza: 'sem_dados', fonte: 'historico_core', registrosConsultados: 0, aviso: 'Sem dados reais, nenhuma previsão é apresentada.' });
     const prompt = [
       'Você é um assistente consultivo de monitoramento de drenagem urbana.',
       'O Core HydraSmart é a única autoridade para cálculos, medições e níveis de alerta.',
       'Não calcule nem redefina índices, riscos, médias ou limites; não invente números.',
+      'Não afirme previsão de alagamento nem probabilidade numérica sem um modelo preditivo validado pelo Core. Você pode apontar sinais qualitativos e incertezas.',
       'Interprete somente os dados fornecidos, indique limitações e diferencie observações de hipóteses.',
       'Jamais apresente uma recomendação como alerta automático ou decisão operacional definitiva.',
       'Responda em português brasileiro, com concisão.',
