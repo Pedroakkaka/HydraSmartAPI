@@ -15,6 +15,7 @@ import rotasLeituras from './routes/leituras.js';
 import rotasOperacao from './routes/operacao.js';
 import rotasExternas from './routes/externos.js';
 import rotasRelatorios from './routes/relatorios.js';
+import rotasIA from './routes/ia.js';
 
 /**
  * @param {object} ctx Contexto criado por criarContexto()
@@ -66,7 +67,7 @@ export async function construirApp(ctx, { logger = false } = {}) {
   await registrarWebSocket(app, ctx);
 
   await app.register(async (api) => {
-    for (const rotas of [rotasSistema, rotasBueiros, rotasLeituras, rotasOperacao, rotasExternas, rotasRelatorios]) {
+    for (const rotas of [rotasSistema, rotasBueiros, rotasLeituras, rotasOperacao, rotasExternas, rotasRelatorios, rotasIA]) {
       await api.register(rotas, { ctx });
     }
   }, { prefix: '/api/v1' });
