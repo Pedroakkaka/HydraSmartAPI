@@ -64,6 +64,39 @@ export async function construirApp(ctx, { logger = false } = {}) {
 
   app.setNotFoundHandler((req, reply) => reply.code(404).send({ erro: `Rota não encontrada: ${req.method} ${req.url}` }));
 
+  // Proteção das rotas de escrita antes de disponibilizar a API via túnel HTTPS.
+  // Chave de operador exclusiva do backend; nunca incluí-la no bundle público do React.
+  const operatorKey = process.env.OPERATOR_API_KEY;
+  app.addHook('onRequest', async (req, reply) => {
+    const path = req.url.split('?')[0];
+    const isMutation = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method);
+    const isIngest = req.method === 'POST' && path === '/api/v1/leituras';
+    const isAI = req.method === 'POST' && path === '/api/v1/ia/analisar';
+    if (!isMutation || isIngest || isAI || !path.startsWith('/api/v1/')) return;
+    if (!operatorKey) return reply.code(503).send({ erro: 'Operações administrativas desabilitadas: configure OPERATOR_API_KEY no backend.' });
+    const provided = req.headers['x-operator-key'];
+    if (typeof provided !== 'string' || provided !== operatorKey) {
+      return reply.code(401).send({ erro: 'Chave de operador necessária.' });
+    }
+  });
+
+  // Limite básico de consumo da IA por endereço de origem; não substitui
+  // autenticação e cotas no provedor Gemini.
+  const aiHits = new Map();
+  app.addHook('onRequest', async (req, reply) => {
+    if (req.method !== 'POST' || req.url.split('?')[0] !== '/api/v1/ia/analisar') return;
+    const now = Date.now();
+    const key = req.ip;
+    const prev = aiHits.get(key);
+    const entry = prev && now - prev.start < 60000 ? prev : { start: now, count: 0 };
+    entry.count++;
+    aiHits.set(key, entry);
+    if (aiHits.size > 2000) {
+      for (const [ip, item] of aiHits) if (now - item.start >= 60000) aiHits.delete(ip);
+    }
+    if (entry.count > 5) return reply.code(429).send({ erro: 'Limite de análises atingido. Tente novamente em um minuto.' });
+  });
+
   await registrarWebSocket(app, ctx);
 
   await app.register(async (api) => {
