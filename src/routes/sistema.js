@@ -1,4 +1,22 @@
+import { timingSafeEqual } from 'node:crypto';
+
 export default async function rotasSistema(app, { ctx }) {
+  // Validação sem efeito colateral: permite selecionar a fonte no painel.
+  app.get('/operador/validar', {
+    schema: { tags: ['Sistema'], summary: 'Valida credenciais do operador para a seleção de modo' }
+  }, async (req, reply) => {
+    const esperada = ctx.config.operatorApiKey;
+    const recebida = req.headers['x-operator-key'];
+    if (!esperada) return reply.code(503).send({ erro: 'Chave de operador não configurada.' });
+    const a = Buffer.from(typeof recebida === 'string' ? recebida : '');
+    const b = Buffer.from(esperada);
+    if (a.length !== b.length || !timingSafeEqual(a, b)) {
+      return reply.code(401).send({ erro: 'Chave de operador incorreta.' });
+    }
+    reply.header('Cache-Control', 'no-store');
+    return { autorizado: true };
+  });
+
   app.get('/health', {
     schema: { tags: ['Sistema'], summary: 'Verificação de saúde (usada pelo Docker e pelo painel)' }
   }, async (req, reply) => {
