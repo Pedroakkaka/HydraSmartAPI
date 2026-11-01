@@ -112,6 +112,37 @@ test('CEMADEN preserva a última resposta válida como desatualizada após falha
   }
 });
 
+test('Defesa Civil preserva a última consulta válida como desatualizada após falha', async () => {
+  const fetchOriginal = globalThis.fetch;
+  const nowOriginal = Date.now;
+  let agora = nowOriginal();
+  Date.now = () => agora;
+  globalThis.fetch = async () => ({
+    ok: true,
+    json: async () => ({ data: { tags_data: {
+      qualle_meteorologia: [{ codigo: 'DCRS-00044', name: { general: 'Estação teste' }, position: {}, data: {} }],
+      proximaAtualizacaoEm: null
+    } } })
+  });
+  try {
+    const atual = await app.inject('/api/v1/hidrologia/estacoes');
+    assert.equal(atual.statusCode, 200);
+    assert.equal(atual.json().status, 'sucesso');
+    const consultadoEm = atual.json().consultadoEm;
+    agora += 300_001;
+    globalThis.fetch = async () => { throw new Error('indisponibilidade simulada'); };
+    const anterior = await app.inject('/api/v1/hidrologia/estacoes');
+    assert.equal(anterior.statusCode, 200);
+    assert.equal(anterior.json().status, 'desatualizado');
+    assert.equal(anterior.json().consultadoEm, consultadoEm);
+    assert.equal(anterior.json().estacoes.length, 1);
+    assert.ok(anterior.json().erroMensagem);
+  } finally {
+    Date.now = nowOriginal;
+    globalThis.fetch = fetchOriginal;
+  }
+});
+
 test('alerta crítico abre acima do limiar e encerra quando o nível baixa', async () => {
   await enviar({ bueiroId: 2, distanciaCm: 3 }); // 94,4%
   let ativos = (await app.inject('/api/v1/alertas?ativos=true')).json();
