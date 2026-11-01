@@ -44,6 +44,38 @@ export default async function rotasIA(app, { ctx }) {
   let proximaTentativa = 0;
   let analisePendente = null;
   const analisesAnteriores = [];
+  let testeCloudflareExecutado = false;
+
+  // Teste manual: exige OPERATOR_API_KEY pelo hook global, flag específica e
+  // permite no máximo uma chamada ao provedor por inicialização do servidor.
+  app.post('/ia/testar-cloudflare', {
+    schema: {
+      tags: ['Inteligência artificial'],
+      summary: 'Teste manual e limitado da conexão com Cloudflare Workers AI'
+    }
+  }, async (req, reply) => {
+    if (!ctx.config.enableAiTest) {
+      return reply.code(503).send({ erro: 'Teste de IA desativado. Configure ENABLE_AI_TEST=true apenas durante a validação.' });
+    }
+    if (!ctx.config.cloudflareAccountId || !ctx.config.cloudflareApiToken) {
+      return reply.code(503).send({ erro: 'Credenciais Cloudflare ausentes no servidor.' });
+    }
+    if (testeCloudflareExecutado) {
+      return reply.code(429).send({ erro: 'Teste já executado nesta inicialização. Desative ENABLE_AI_TEST após verificar o resultado.' });
+    }
+    testeCloudflareExecutado = true;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+      const analise = await gerarTextoIA('Responda em português brasileiro, em uma frase curta: conexão de teste HydraSmart estabelecida. Não analise riscos ou dados ambientais.', controller.signal, ctx.config);
+      return { status: 'sucesso', provedor: 'cloudflare_workers_ai', resposta: analise, aviso: 'Teste de conectividade, sem dados reais ou previsão ambiental.' };
+    } catch (erro) {
+      req.log.warn({ statusCloudflare: erro.statusCloudflare ?? null, nome: erro.name }, 'Teste Cloudflare falhou');
+      return reply.code(502).send({ status: 'erro', codigoCloudflare: erro.statusCloudflare ?? null, erro: erro.name === 'AbortError' ? 'Tempo limite excedido.' : 'Falha ao consultar a Cloudflare. Verifique credenciais, permissões e modelo.' });
+    } finally {
+      clearTimeout(timeout);
+    }
+  });
   app.get('/ia/relatorio', async (req) => {
     if (!ctx.config.enableAutomaticAi || !ctx.config.cloudflareApiToken) {
       return { status: 'indisponivel', mensagem: 'Análise automática por IA desativada ou sem configuração segura no servidor.' };
