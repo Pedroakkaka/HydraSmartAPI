@@ -46,6 +46,7 @@ export function carregarConfig(env = process.env) {
     openAiApiKey: env.OPENAI_API_KEY || '',
     openAiModel: env.OPENAI_MODEL || 'gpt-4.1-mini',
     enableAutomaticAi: bool(env.ENABLE_AUTOMATIC_AI, false),
+    enableAiTest: bool(env.ENABLE_AI_TEST, false),
     enablePublicAi: bool(env.ENABLE_PUBLIC_AI, false),
     cemadenToken: env.CEMADEN_JWT_TOKEN || env.CEMADEN_TOKEN || '',
     cemadenEmail: env.CEMADEN_EMAIL || '',
