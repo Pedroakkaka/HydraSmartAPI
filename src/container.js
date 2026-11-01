@@ -5,6 +5,7 @@
 
 import { TelemetryState } from './domain/telemetryState.js';
 import { AlertService } from './services/alertService.js';
+import { SimuladorDefesaCivil } from './services/simuladorDefesaCivil.js';
 import { IngestService } from './services/ingestService.js';
 import { Simulator } from './services/simulator.js';
 import { WeatherService } from './services/weatherService.js';
@@ -27,6 +28,7 @@ export async function criarContexto({ config, repositorios, log }) {
 
   const alertas = new AlertService({ repositorios, log });
   await alertas.inicializar();
+  const simuladorDefesaCivil = new SimuladorDefesaCivil({ alertas });
 
   const ingest = new IngestService({ estado, repositorios, alertas, log });
   const simulador = new Simulator({ estado, ingest, alertas, log });
@@ -86,6 +88,7 @@ export async function criarContexto({ config, repositorios, log }) {
     repositorios,
     estado,
     alertas,
+    simuladorDefesaCivil,
     ingest,
     simulador,
     serial,
@@ -103,6 +106,7 @@ export async function criarContexto({ config, repositorios, log }) {
     async encerrar() {
       clearInterval(timerLiveness);
       simulador.parar();
+      simuladorDefesaCivil.encerrar();
       await serial.encerrar();
       await repositorios.fechar();
     }
