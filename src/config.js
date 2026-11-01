@@ -38,6 +38,11 @@ export function carregarConfig(env = process.env) {
     // Chave exigida no POST /api/v1/leituras (sensores em campo enviando via HTTP).
     ingestApiKey: env.INGEST_API_KEY || '',
     operatorApiKey: env.OPERATOR_API_KEY || '',
+    // Cloudflare Workers AI: credenciais apenas no backend.
+    cloudflareAccountId: env.CLOUDFLARE_ACCOUNT_ID || '',
+    cloudflareApiToken: env.CLOUDFLARE_API_TOKEN || '',
+    cloudflareAiModel: env.CLOUDFLARE_AI_MODEL || '@cf/meta/llama-3.1-8b-instruct',
+    // Compatibilidade temporária até migrar src/routes/ia.js para Cloudflare.
     openAiApiKey: env.OPENAI_API_KEY || '',
     openAiModel: env.OPENAI_MODEL || 'gpt-4.1-mini',
     enableAutomaticAi: bool(env.ENABLE_AUTOMATIC_AI, false),
