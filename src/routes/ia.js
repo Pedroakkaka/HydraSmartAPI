@@ -1,16 +1,34 @@
 /**
- * Gemini é consultivo: recebe somente históricos e resultados do Core.
+ * OpenAI é consultiva: recebe somente históricos e resultados do Core.
  * Não altera sensores, calibração, limiares ou alertas.
  */
-const MODELO = 'gemini-2.5-flash';
+const MODELO = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
+async function gerarTextoIA(prompt, signal) {
+  const resposta = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + process.env.OPENAI_API_KEY },
+    body: JSON.stringify({
+      model: MODELO,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.2,
+      max_completion_tokens: 1000
+    }),
+    signal
+  });
+  if (!resposta.ok) throw new Error('OpenAI indisponível: HTTP ' + resposta.status);
+  const dados = await resposta.json();
+  const texto = dados.choices?.[0]?.message?.content?.trim();
+  if (!texto) throw new Error('A OpenAI retornou uma resposta vazia.');
+  return texto;
+}
 export default async function rotasIA(app, { ctx }) {
   // Relatório automático: um único resultado em cache para todos os visitantes.
-  // Nunca expõe a chave Gemini; não gera chamadas repetidas por visitante.
+  // Nunca expõe a chave OpenAI; não gera chamadas repetidas por visitante.
   let relatorioCache = null;
   let proximaTentativa = 0;
   let analisePendente = null;
   app.get('/ia/relatorio', async (req, reply) => {
-    if (process.env.ENABLE_AUTOMATIC_AI !== 'true' || !process.env.GEMINI_API_KEY) {
+    if (process.env.ENABLE_AUTOMATIC_AI !== 'true' || !process.env.OPENAI_API_KEY) {
       return { status: 'indisponivel', mensagem: 'Relatório automático ainda não configurado no servidor.' };
     }
     const agora = Date.now();
@@ -36,16 +54,7 @@ export default async function rotasIA(app, { ctx }) {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 15000);
         try {
-          const resposta = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + MODELO + ':generateContent', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY },
-            body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature: 0.25, maxOutputTokens: 1000 } }),
-            signal: controller.signal
-          });
-          if (!resposta.ok) throw new Error('Gemini retornou status ' + resposta.status);
-          const dados = await resposta.json();
-          const texto = dados.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('\\n').trim();
-          if (!texto) throw new Error('Resposta vazia');
+          const texto = await gerarTextoIA(prompt, controller.signal);
           relatorioCache = { status: 'disponivel', analise: texto, registrosConsultados: historico.length, geradoEm: new Date().toISOString(), aviso: 'Interpretação automática; não constitui previsão validada de alagamento.' };
         } finally { clearTimeout(timer); }
       } catch (erro) {
@@ -72,8 +81,8 @@ export default async function rotasIA(app, { ctx }) {
       }
     }
   }, async (req, reply) => {
-    const chave = process.env.GEMINI_API_KEY;
-    if (!chave) return reply.code(503).send({ erro: 'IA indisponível: configure GEMINI_API_KEY no backend.' });
+    const chave = process.env.OPENAI_API_KEY;
+    if (!chave) return reply.code(503).send({ erro: 'IA indisponível: configure OPENAI_API_KEY no backend.' });
     const { pergunta = 'Interprete as tendências observadas no histórico.', bueiroId, limite = 40 } = req.body || {};
     const leituras = await ctx.repositorios.leituras.listar({ ...(bueiroId ? { bueiroId } : {}), limite });
     const historico = Array.isArray(leituras) ? leituras : (leituras?.dados || leituras?.leituras || []);
@@ -92,22 +101,10 @@ export default async function rotasIA(app, { ctx }) {
     const controlador = new AbortController();
     const timeout = setTimeout(() => controlador.abort(), 15000);
     try {
-      const resposta = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + MODELO + ':generateContent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': chave },
-        body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature: 0.2, maxOutputTokens: 1000 } }),
-        signal: controlador.signal
-      });
-      if (!resposta.ok) {
-        req.log.warn({ status: resposta.status }, 'Gemini indisponível');
-        return reply.code(502).send({ erro: 'Serviço de IA temporariamente indisponível.' });
-      }
-      const dados = await resposta.json();
-      const analise = dados.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('\n').trim();
-      if (!analise) return reply.code(502).send({ erro: 'A IA não retornou uma análise.' });
+      const analise = await gerarTextoIA(prompt, controlador.signal);
       return { analise, natureza: 'interpretacao_ia', fonte: 'historico_core', registrosConsultados: historico.length, aviso: 'Interpretação consultiva; o Core permanece responsável por cálculos e alertas.' };
     } catch (erro) {
-      req.log.warn({ err: erro }, 'Falha ao consultar Gemini');
+      req.log.warn({ err: erro }, 'Falha ao consultar OpenAI');
       return reply.code(502).send({ erro: 'Não foi possível consultar a IA agora.' });
     } finally { clearTimeout(timeout); }
   });
