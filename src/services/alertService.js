@@ -21,12 +21,12 @@ export class AlertService extends EventEmitter {
     await this.repo.encerrarTodosAbertos();
   }
 
-  _chave(bueiroId, simulado) {
-    return `${bueiroId}:${simulado ? 'simulado' : 'real'}`;
+  _chave(bueiroId, simulado, canal = null) {
+    return `${bueiroId}:${canal || (simulado ? 'simulado' : 'real')}`;
   }
 
-  async avaliar({ bueiroId, nomeBueiro, nivelPct, risco }, { simulado }) {
-    const chave = this._chave(bueiroId, simulado);
+  async avaliar({ bueiroId, nomeBueiro, nivelPct, risco }, { simulado, canal = null }) {
+    const chave = this._chave(bueiroId, simulado, canal);
     const aberto = this.abertos.get(chave);
 
     try {
@@ -36,7 +36,9 @@ export class AlertService extends EventEmitter {
             bueiroId,
             nivelPct,
             simulado,
-            mensagem: `Nível crítico no ${nomeBueiro} (${nivelPct.toFixed(1)}%). Risco iminente de transbordo!`
+            mensagem: simulado
+              ? `[TESTE ${canal === 'prototipo' ? 'PROTÓTIPO' : 'SIMULAÇÃO'}] Nível crítico no ${nomeBueiro} (${nivelPct.toFixed(1)}%). Não é um alerta à população.`
+              : `Nível crítico no ${nomeBueiro} (${nivelPct.toFixed(1)}%). Risco iminente de transbordo!`
           });
           this.abertos.set(chave, alerta);
           this.emit('alerta', { acao: 'disparado', alerta });
