@@ -1,3 +1,4 @@
+import { coletarContextoIA } from '../services/iaFontes.js';
 /**
  * OpenAI é consultiva: recebe somente históricos e resultados do Core.
  * Não altera sensores, calibração, limiares ou alertas.
@@ -22,44 +23,57 @@ async function gerarTextoIA(prompt, signal) {
   return texto;
 }
 export default async function rotasIA(app, { ctx }) {
-  // Relatório automático: um único resultado em cache para todos os visitantes.
-  // Nunca expõe a chave OpenAI; não gera chamadas repetidas por visitante.
+  // Relatório compartilhado, cache de 30 min e memória curta de análises.
+  // Memória de análises é volátil (reinício apaga); não é treinamento do modelo.
   let relatorioCache = null;
   let proximaTentativa = 0;
   let analisePendente = null;
-  app.get('/ia/relatorio', async (req, reply) => {
+  const analisesAnteriores = [];
+  app.get('/ia/relatorio', async (req) => {
     if (process.env.ENABLE_AUTOMATIC_AI !== 'true' || !process.env.OPENAI_API_KEY) {
-      return { status: 'indisponivel', mensagem: 'Relatório automático ainda não configurado no servidor.' };
+      return { status: 'indisponivel', mensagem: 'Configure OPENAI_API_KEY e ENABLE_AUTOMATIC_AI=true no servidor.' };
     }
     const agora = Date.now();
     if (relatorioCache && agora < proximaTentativa) return relatorioCache;
-    if (analisePendente) return relatorioCache || { status: 'processando', mensagem: 'Análise histórica em andamento.' };
+    if (analisePendente) return relatorioCache || { status: 'processando', mensagem: 'Análise em andamento.' };
     if (agora < proximaTentativa) return relatorioCache || { status: 'aguardando', mensagem: 'Aguardando próxima análise.' };
-    proximaTentativa = agora + 15 * 60_000;
+    proximaTentativa = agora + 30 * 60_000;
     analisePendente = (async () => {
       try {
-        const registros = await ctx.repositorios.leituras.listar({ limite: 100 });
-        const historico = Array.isArray(registros) ? registros : [];
-        if (historico.length < 5) {
-          relatorioCache = { status: 'sem_dados', mensagem: 'São necessárias pelo menos cinco leituras históricas para gerar um relatório.', registrosConsultados: historico.length };
+        const contexto = await coletarContextoIA(app, ctx);
+        if (!contexto.registrosConsultados) {
+          relatorioCache = { status: 'sem_dados', mensagem: 'Nenhum dado real disponível nas fontes consultadas.', fontes: [], avisosFontes: contexto.avisos, registrosConsultados: 0 };
           return;
         }
         const prompt = [
-          'Você é um analista consultivo de drenagem urbana. Escreva um relatório original em português brasileiro, com 2 a 4 parágrafos.',
-          'Analise somente as leituras históricas fornecidas, destacando tendências, anomalias, comparações e limitações.',
-          'Não invente medições, probabilidades de alagamento, tempo de enchimento nem previsões numéricas não validadas.',
-          'Diferencie observação de hipótese. Não modifique alertas ou regras do sistema.',
-          'Leituras históricas (JSON): ' + JSON.stringify(historico).slice(0, 30000)
+          'Você é um analista consultivo de drenagem urbana em Porto Alegre, RS. Produza um relatório em português brasileiro de 2 a 4 parágrafos.',
+          'Compare observações atuais com históricos disponíveis, identifique tendências e limitações. Cite estações, datas, fontes e unidades.',
+          'Dados Open-Meteo históricos são reanálise, não leituras de pluviômetros. Níveis de estações regionais NÃO são níveis de bueiros.',
+          'Não invente riscos, previsões, probabilidades, alarmes, leituras ausentes ou validações. Status oficial ausente não significa normalidade.',
+          'Não trate medições de épocas diferentes como simultâneas. Não assuma que níveis de estações diferentes possuem a mesma referência altimétrica.',
+          'A IA não altera o Core nem determina alertas. Histórico de relatórios não é treinamento ou aprendizado de pesos do modelo.',
+          'Contexto real (JSON): ' + JSON.stringify(contexto.fontes).slice(0, 45000),
+          'Relatórios anteriores (somente contexto, não fonte de medição): ' + JSON.stringify(analisesAnteriores).slice(0, 3500)
         ].join('\\n');
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 15000);
+        const timer = setTimeout(() => controller.abort(), 20000);
         try {
           const texto = await gerarTextoIA(prompt, controller.signal);
-          relatorioCache = { status: 'disponivel', analise: texto, registrosConsultados: historico.length, geradoEm: new Date().toISOString(), aviso: 'Interpretação automática; não constitui previsão validada de alagamento.' };
+          const geradoEm = new Date().toISOString();
+          relatorioCache = {
+            status: 'disponivel', analise: texto, registrosConsultados: contexto.registrosConsultados,
+            fontes: contexto.fontes.map((f) => ({ fonte: f.fonte, tipo: f.tipo, estacao: f.estacao ?? null, registros: f.registros.length })),
+            avisosFontes: contexto.avisos, geradoEm,
+            memoriaAnalises: 'Contexto das últimas análises nesta execução do servidor; não há treinamento automático do modelo.',
+            aviso: 'Análise consultiva de dados oficiais e históricos; não é previsão validada de alagamento.'
+          };
+          analisesAnteriores.push({ geradoEm, resumo: texto.slice(0, 1100) });
+          if (analisesAnteriores.length > 3) analisesAnteriores.shift();
         } finally { clearTimeout(timer); }
       } catch (erro) {
-        req.log.warn({ err: erro }, 'Falha no relatório automático');
-        if (!relatorioCache) relatorioCache = { status: 'erro', mensagem: 'Não foi possível gerar o relatório agora.' };
+        req.log.warn({ err: erro }, 'Falha no relatório OpenAI com fontes oficiais');
+        relatorioCache = { status: 'erro', mensagem: 'Não foi possível gerar a análise agora. Verifique as fontes e a configuração da OpenAI.' };
+        proximaTentativa = Date.now() + 5 * 60_000;
       }
     })().finally(() => { analisePendente = null; });
     await analisePendente;
