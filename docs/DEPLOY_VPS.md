@@ -37,7 +37,10 @@ NODE_ENV=production
 POSTGRES_PASSWORD=<senha forte>
 INGEST_API_KEY=<chave longa e aleatória>
 CORS_ORIGIN=https://seu-dominio.com.br
+GEMINI_API_KEY=<nova chave privada do Google AI Studio>
 ```
+
+**Importante:** um segredo cadastrado em `Settings → Secrets and variables → Actions` no GitHub **não é automaticamente enviado à VPS**. Configure `GEMINI_API_KEY` no `.env` privado da VPS (ou no painel de variáveis da hospedagem). O `docker-compose.yml` repassa a variável para o container `api`; nunca publique o `.env` no repositório.
 
 Depois suba os containers:
 
