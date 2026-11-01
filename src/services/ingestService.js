@@ -34,6 +34,7 @@ export class IngestService {
     if (!id || !this.estado.calibracoes[id]) return { aceita: false, motivo: 'Bueiro desconhecido' };
 
     const simulado = entrada.origem === ORIGENS.SIMULADOR;
+    const canal = simulado ? 'demonstracao' : entrada.origem === ORIGENS.ARDUINO_USB ? 'prototipo' : 'campo';
     if (simulado && this.estado.modo !== MODOS.DEMO) {
       return { aceita: false, motivo: 'Leituras simuladas só são aceitas no modo demonstração' };
     }
@@ -60,16 +61,22 @@ export class IngestService {
       timestamp
     };
 
+    // Cada origem permanece em seu canal mesmo com outro modo selecionado.
+    this.estado.registrarCanal(canal, id, leitura);
+
     const exibirNoPainel = simulado || this.estado.modo === MODOS.REAL;
     if (exibirNoPainel) {
       this.estado.aplicarLeitura(id, grandezas, { origem: entrada.origem, raw: entrada.raw, timestamp });
     }
 
-    if (!simulado) {
+    // Apenas o canal de campo entra no histórico operacional real.
+    // Leituras de bancada permanecem visíveis no canal experimental em memória.
+    if (canal === 'campo') {
       this.repo.inserir(leitura).catch((err) => this.log.error({ err }, '[leituras] falha ao gravar no banco'));
     }
 
-    await this.alertas.avaliar({ bueiroId: id, nomeBueiro: cfg.nome, nivelPct: grandezas.nivelPct, risco }, { simulado });
+    // Alertas de protótipo e cenários são sempre rotulados como testes.
+    await this.alertas.avaliar({ bueiroId: id, nomeBueiro: cfg.nome, nivelPct: grandezas.nivelPct, risco }, { simulado: canal !== 'campo' });
 
     return { aceita: true, leitura };
   }
