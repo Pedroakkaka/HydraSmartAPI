@@ -85,6 +85,11 @@ export async function construirApp(ctx, { logger = false } = {}) {
   const aiHits = new Map();
   app.addHook('onRequest', async (req, reply) => {
     if (req.method !== 'POST' || req.url.split('?')[0] !== '/api/v1/ia/analisar') return;
+    // Fail closed: uma API pública não pode oferecer consumo livre da chave Gemini.
+    // A IA só é reativada após implementar autenticação segura do lado do servidor.
+    if (process.env.ENABLE_PUBLIC_AI !== 'true') {
+      return reply.code(503).send({ erro: 'Análise por IA temporariamente desabilitada para proteger a chave Gemini.' });
+    }
     const now = Date.now();
     const key = req.ip;
     const prev = aiHits.get(key);
