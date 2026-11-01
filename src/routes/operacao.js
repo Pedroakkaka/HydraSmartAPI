@@ -11,6 +11,7 @@ const corpoCenario = {
 };
 
 export default async function rotasOperacao(app, { ctx }) {
+  let ultimoTesteNotificacao = 0;
   // ---------------- Serial (Arduino USB) ----------------
   app.get('/serial', {
     schema: { tags: ['Serial'], summary: 'Status da conexão com o Arduino' }
@@ -93,6 +94,27 @@ export default async function rotasOperacao(app, { ctx }) {
   }, async () => {
     await ctx.simulador.encerrar();
     return ctx.snapshotCompleto();
+  });
+
+  // Transmissão de demonstração, somente pelo WebSocket do próprio HydraSmart.
+  // A chave de operador é exigida no hook global para toda rota POST.
+  app.post('/notificacoes-teste/disparar', {
+    schema: { tags: ['Simulação'], summary: 'Envia apenas alerta experimental aos espectadores inscritos no site' }
+  }, async (req, reply) => {
+    const agora = Date.now();
+    if (agora - ultimoTesteNotificacao < 30000) {
+      return reply.code(429).send({ erro: 'Aguarde 30 segundos entre testes de notificação.' });
+    }
+    ultimoTesteNotificacao = agora;
+    const alerta = {
+      id: 'teste-manual-' + agora,
+      bueiroId: 'teste_manual',
+      simulado: true,
+      nivelPctPico: null,
+      mensagem: '[TESTE PROTÓTIPO] TESTE MANUAL DE NOTIFICAÇÃO. Sem medição de sensor. Não é emergência real. Nenhuma ação necessária.'
+    };
+    ctx.alertas.emit('alerta', { acao: 'disparado', alerta });
+    return { enviadoAoCanalInterno: true, transmissaoExterna: false, aviso: 'Evento de teste publicado para os navegadores conectados; não confirma recebimento no celular.' };
   });
 
   // ---------------- Receptor estritamente interno de testes ----------------
