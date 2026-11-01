@@ -1,24 +1,40 @@
 import { coletarContextoIA } from '../services/iaFontes.js';
 /**
- * OpenAI é consultiva: recebe somente históricos e resultados do Core.
- * Não altera sensores, calibração, limiares ou alertas.
+ * Cloudflare Workers AI interpreta apenas dados e históricos do Core.
+ * Nunca altera sensores, calibração, limiares ou alertas.
  */
 async function gerarTextoIA(prompt, signal, config) {
-  const resposta = await fetch('https://api.openai.com/v1/chat/completions', {
+  const { cloudflareAccountId, cloudflareApiToken, cloudflareAiModel } = config;
+  if (!cloudflareAccountId || !cloudflareApiToken) {
+    throw new Error('Cloudflare Workers AI não configurado.');
+  }
+  const url = 'https://api.cloudflare.com/client/v4/accounts/'
+    + encodeURIComponent(cloudflareAccountId) + '/ai/run/' + cloudflareAiModel;
+  const resposta = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + config.openAiApiKey },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + cloudflareApiToken
+    },
     body: JSON.stringify({
-      model: config.openAiModel,
-      messages: [{ role: 'user', content: prompt }],
+      messages: [
+        { role: 'system', content: 'Você é um analista consultivo do HydraSmart. Não invente medições, previsões ou alertas.' },
+        { role: 'user', content: prompt }
+      ],
       temperature: 0.2,
-      max_completion_tokens: 1000
+      max_tokens: 1000
     }),
     signal
   });
-  if (!resposta.ok) { const erro = new Error('OpenAI HTTP ' + resposta.status); erro.statusOpenAI = resposta.status; throw erro; }
+  if (!resposta.ok) {
+    const erro = new Error('Cloudflare HTTP ' + resposta.status);
+    erro.statusCloudflare = resposta.status;
+    throw erro;
+  }
   const dados = await resposta.json();
-  const texto = dados.choices?.[0]?.message?.content?.trim();
-  if (!texto) throw new Error('A OpenAI retornou uma resposta vazia.');
+  if (dados.success === false) throw new Error('Cloudflare recusou a solicitação.');
+  const texto = dados.result?.response?.trim();
+  if (!texto) throw new Error('A Cloudflare retornou uma resposta vazia.');
   return texto;
 }
 export default async function rotasIA(app, { ctx }) {
@@ -29,7 +45,7 @@ export default async function rotasIA(app, { ctx }) {
   let analisePendente = null;
   const analisesAnteriores = [];
   app.get('/ia/relatorio', async (req) => {
-    if (!ctx.config.enableAutomaticAi || !ctx.config.openAiApiKey) {
+    if (!ctx.config.enableAutomaticAi || !ctx.config.cloudflareApiToken) {
       return { status: 'indisponivel', mensagem: 'Análise automática por IA desativada ou sem configuração segura no servidor.' };
     }
     const agora = Date.now();
@@ -70,17 +86,17 @@ export default async function rotasIA(app, { ctx }) {
           if (analisesAnteriores.length > 3) analisesAnteriores.shift();
         } finally { clearTimeout(timer); }
       } catch (erro) {
-        req.log.warn({ err: erro }, 'Falha no relatório OpenAI com fontes oficiais');
-        const codigo = erro.statusOpenAI;
-        const causa = codigo === 401 ? 'Chave OPENAI_API_KEY inválida ou revogada.'
-          : codigo === 429 ? 'Limite de uso ou créditos da OpenAI atingidos.'
-          : codigo === 403 ? 'Acesso ao modelo OpenAI não autorizado.'
-          : codigo === 400 ? 'A OpenAI rejeitou a solicitação; verifique o modelo configurado.'
-          : codigo >= 500 ? 'Serviço da OpenAI temporariamente indisponível.'
+        req.log.warn({ err: erro }, 'Falha no relatório Cloudflare com fontes oficiais');
+        const codigo = erro.statusCloudflare;
+        const causa = codigo === 401 ? 'Token CLOUDFLARE_API_TOKEN inválido ou revogado.'
+          : codigo === 429 ? 'Limite de uso ou créditos da Cloudflare atingidos.'
+          : codigo === 403 ? 'Acesso ao modelo Cloudflare não autorizado.'
+          : codigo === 400 ? 'A Cloudflare rejeitou a solicitação; verifique o modelo configurado.'
+          : codigo >= 500 ? 'Serviço da Cloudflare temporariamente indisponível.'
           : erro.name === 'TimeoutError' || erro.name === 'AbortError' ? 'Tempo limite excedido na consulta.'
-          : erro.message?.includes('resposta vazia') ? 'A OpenAI retornou um texto vazio.'
-          : 'Falha na consulta às fontes ou à OpenAI; verifique o terminal do backend.';
-        relatorioCache = { status: 'erro', mensagem: causa, codigoOpenAI: codigo ?? null };
+          : erro.message?.includes('resposta vazia') ? 'A Cloudflare retornou um texto vazio.'
+          : 'Falha na consulta às fontes ou à Cloudflare; verifique o terminal do backend.';
+        relatorioCache = { status: 'erro', mensagem: causa, codigoCloudflare: codigo ?? null };
         proximaTentativa = Date.now() + 5 * 60_000;
       }
     })().finally(() => { analisePendente = null; });
@@ -103,7 +119,7 @@ export default async function rotasIA(app, { ctx }) {
       }
     }
   }, async (req, reply) => {
-    if (!ctx.config.openAiApiKey || !ctx.config.enablePublicAi) {
+    if (!ctx.config.cloudflareApiToken || !ctx.config.enablePublicAi) {
       return reply.code(503).send({ erro: 'Análise por IA está desativada ou sem configuração segura no servidor.' });
     }
     const { pergunta = 'Interprete as tendências observadas no histórico.', bueiroId, limite = 40 } = req.body || {};
@@ -127,7 +143,7 @@ export default async function rotasIA(app, { ctx }) {
       const analise = await gerarTextoIA(prompt, controlador.signal, ctx.config);
       return { analise, natureza: 'interpretacao_ia', fonte: 'historico_core', registrosConsultados: historico.length, aviso: 'Interpretação consultiva; o Core permanece responsável por cálculos e alertas.' };
     } catch (erro) {
-      req.log.warn({ err: erro }, 'Falha ao consultar OpenAI');
+      req.log.warn({ err: erro }, 'Falha ao consultar Cloudflare');
       return reply.code(502).send({ erro: 'Não foi possível consultar a IA agora.' });
     } finally { clearTimeout(timeout); }
   });
