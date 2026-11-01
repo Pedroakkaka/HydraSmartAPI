@@ -10,6 +10,9 @@ import { criarRepositoriosMemoria } from '../src/repositories/memoria.js';
 import { criarContexto } from '../src/container.js';
 import { construirApp } from '../src/app.js';
 import { CemadenService } from '../src/services/cemadenService.js';
+import { OsmService } from '../src/services/osmService.js';
+import { WeatherService } from '../src/services/weatherService.js';
+import { BocasLoboService } from '../src/services/bocasLoboService.js';
 
 const logMudo = { info() {}, warn() {}, error() {}, debug() {} };
 const operatorKey = 'test-only-hydrasmart-operator-key';
@@ -143,6 +146,86 @@ test('Defesa Civil preserva a última consulta válida como desatualizada após 
   }
 });
 
+test('Open-Meteo preserva a última resposta válida como desatualizada após falha', async () => {
+  const fetchOriginal = globalThis.fetch;
+  let chamadas = 0;
+  globalThis.fetch = async () => {
+    chamadas++;
+    if (chamadas > 1) throw new Error('indisponibilidade simulada');
+    return { ok: true, json: async () => ({ current: {
+      time: '2026-11-01T10:00', temperature_2m: 21, relative_humidity_2m: 70,
+      precipitation: 0, rain: 0, weather_code: 1
+    }, hourly: { time: [] }, daily: { time: [] } }) };
+  };
+  try {
+    const clima = new WeatherService({ municipio: carregarConfig({ NODE_ENV: 'test' }).municipio, log: logMudo, ttlMs: 0 });
+    const atual = await clima.obter();
+    const anterior = await clima.obter({ forcar: true });
+    assert.equal(atual.status, 'sucesso');
+    assert.equal(anterior.status, 'desatualizado');
+    assert.equal(anterior.horarioUltimaConsulta, atual.horarioUltimaConsulta);
+    assert.equal(anterior.temperatura, 21);
+    assert.ok(anterior.erroMensagem);
+    globalThis.fetch = async () => { throw new Error('indisponibilidade simulada'); };
+    const semCache = await new WeatherService({ municipio: carregarConfig({ NODE_ENV: 'test' }).municipio, log: logMudo, ttlMs: 0 }).obter();
+    assert.equal(semCache.status, 'erro');
+    assert.equal(semCache.temperatura, null);
+    assert.equal(semCache.precipitacaoObservadaMm, null);
+  } finally {
+    globalThis.fetch = fetchOriginal;
+  }
+});
+
+test('OSM preserva cache vencido como desatualizado e não inventa elementos', async () => {
+  const fetchOriginal = globalThis.fetch;
+  let chamadas = 0;
+  globalThis.fetch = async () => {
+    chamadas++;
+    if (chamadas > 1) throw new Error('indisponibilidade simulada');
+    return { ok: true, json: async () => ({ elements: [{ id: 77, lat: -30.03, lon: -51.21, tags: { manhole: 'drain' } }] }) };
+  };
+  try {
+    const osm = new OsmService({ log: logMudo, ttlMs: 0 });
+    const atual = await osm.obterDrenos();
+    const anterior = await osm.obterDrenos({ forcar: true });
+    assert.equal(atual.status, 'sucesso');
+    assert.equal(anterior.status, 'desatualizado');
+    assert.equal(anterior.consultadoEm, atual.consultadoEm);
+    assert.deepEqual(anterior.elementos, atual.elementos);
+    assert.equal(chamadas, 4, 'três tentativas de servidores alternativos após a primeira resposta');
+
+    globalThis.fetch = async () => { throw new Error('indisponibilidade simulada'); };
+    const semCache = await new OsmService({ log: logMudo, ttlMs: 0 }).obterDrenos();
+    assert.equal(semCache.status, 'indisponivel');
+    assert.deepEqual(semCache.elementos, []);
+  } finally {
+    globalThis.fetch = fetchOriginal;
+  }
+});
+
+test('cadastro municipal preserva cache como desatualizado e sinaliza ausência sem cache', async () => {
+  const fetchOriginal = globalThis.fetch;
+  globalThis.fetch = async () => ({ ok: true, json: async () => ({ features: [{
+    attributes: { OBJECTID: 12, TIPO: 'boca_de_lobo' }, geometry: { y: -30.03, x: -51.21 }
+  }] }) });
+  try {
+    const servico = new BocasLoboService({ log: logMudo });
+    const atual = await servico.obter();
+    globalThis.fetch = async () => { throw new Error('indisponibilidade simulada'); };
+    const anterior = await servico.obter({ forcar: true });
+    assert.equal(atual.status, 'sucesso');
+    assert.equal(anterior.status, 'desatualizado');
+    assert.equal(anterior.consultadoEm, atual.consultadoEm);
+    assert.deepEqual(anterior.elementos, atual.elementos);
+
+    const semCache = await new BocasLoboService({ log: logMudo }).obter();
+    assert.equal(semCache.status, 'indisponivel');
+    assert.deepEqual(semCache.elementos, []);
+  } finally {
+    globalThis.fetch = fetchOriginal;
+  }
+});
+
 test('alerta crítico abre acima do limiar e encerra quando o nível baixa', async () => {
   await enviar({ bueiroId: 2, distanciaCm: 3 }); // 94,4%
   let ativos = (await app.inject('/api/v1/alertas?ativos=true')).json();
@@ -182,7 +265,8 @@ test('modo demonstração não grava dados simulados no banco', async () => {
   const estado = r.json();
   assert.equal(estado.modo, 'demo');
   assert.ok(estado.bueiros.bueiro_1.nivelPct > 80);
-  assert.equal(estado.maquete3D.status, 'simulado');
+  assert.equal('laminaRuaCm' in estado.simulacao, false);
+  assert.equal('maquete3D' in estado, false);
   assert.equal(estado.alertasAtivos.length, 2);
 
   assert.equal((await app.inject('/api/v1/leituras')).json().length, 0);

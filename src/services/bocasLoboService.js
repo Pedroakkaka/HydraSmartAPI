@@ -56,6 +56,14 @@ export class BocasLoboService {
       }, { forcar });
     } catch (err) {
       this.log.warn({ err }, 'Cadastro municipal de bocas de lobo indisponível');
+      if (cache.valor) {
+        return {
+          ...cache.valor,
+          status: 'desatualizado',
+          mensagem: 'Serviço municipal indisponível; exibindo o último cadastro válido em cache, que pode estar desatualizado.',
+          erroMensagem: 'Não foi possível atualizar o cadastro municipal.'
+        };
+      }
       return { status: 'indisponivel', elementos: [], mensagem: 'Cadastro municipal temporariamente indisponível.', fonte: 'SMAMUS' };
     }
   }
