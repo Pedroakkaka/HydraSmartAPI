@@ -76,7 +76,7 @@ export class IngestService {
     }
 
     // Alertas de protótipo e cenários são sempre rotulados como testes.
-    await this.alertas.avaliar({ bueiroId: id, nomeBueiro: cfg.nome, nivelPct: grandezas.nivelPct, risco }, { simulado: canal !== 'campo' });
+    await this.alertas.avaliar({ bueiroId: id, nomeBueiro: cfg.nome, nivelPct: grandezas.nivelPct, risco }, { simulado: canal !== 'campo', canal });
 
     return { aceita: true, leitura };
   }
