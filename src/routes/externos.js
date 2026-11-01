@@ -160,31 +160,16 @@ export default async function rotasExternas(app, { ctx }) {
       querystring: {
         type: 'object', additionalProperties: false, required: ['estacao', 'inicio', 'fim'],
         properties: {
-          estacao: { type: 'string', pattern: '^[A-Za-z0-9-]{3,40}
-    schema: { tags: ['Fontes externas'], summary: 'Dados da integração CEMADEN (estação ainda configurada para Cáceres)', querystring: queryForcar }
-  }, async (req) => ctx.cemaden.obter({ forcar: req.query.forcar }));
-
-  app.get('/bocas-de-lobo', {
-    schema: { tags: ['Fontes externas'], summary: 'Cadastro oficial de bocas de lobo de Porto Alegre (SMAMUS)', querystring: { type: 'object', properties: { bbox: { type: 'string' }, forcar: { type: 'boolean', default: false } } } }
-  }, async (req) => ctx.bocasLobo.obter({ bbox: req.query.bbox, forcar: req.query.forcar }));
-
-  app.get('/osm/drenos', {
-    schema: { tags: ['Fontes externas'], summary: 'Bueiros e drenos de Porto Alegre mapeados no OpenStreetMap', querystring: queryForcar }
-  }, async (req) => ctx.osm.obterDrenos({ forcar: req.query.forcar }));
-
-  app.get('/historico-oficial', {
-    schema: { tags: ['Fontes externas'], summary: 'Registros históricos existentes (ainda referentes a Cáceres; não usar como histórico de Porto Alegre)' }
-  }, async () => registrosOficiais);
-}
- },
-          inicio: { type: 'string' }, fim: { type: 'string' },
+          estacao: { type: 'string', pattern: '^[A-Za-z0-9-]{3,40}$' },
+          inicio: { type: 'string' },
+          fim: { type: 'string' },
           intervalo: { type: 'string', enum: ['MIN_5', 'MIN_10', 'HOUR_1', 'HOUR_3', 'HOUR_6', 'HOUR_12'], default: 'HOUR_1' }
         }
       }
     }
   }, async (req, reply) => {
     const { estacao, inicio, fim, intervalo } = req.query;
-    const formato = /^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$/;
+    const formato = /^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$/;
     if (!formato.test(inicio) || !formato.test(fim)) {
       return reply.code(400).send({ erro: 'Use inicio e fim no formato AAAA-MM-DD HH:MM:SS (Brasília).' });
     }
