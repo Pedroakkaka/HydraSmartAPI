@@ -140,8 +140,13 @@ export class TelemetryState extends EventEmitter {
 
   registrarCanal(canal, id, leitura) {
     if (!Object.hasOwn(this.canais, canal)) return;
+    const anterior = this.canais[canal][id];
+    const historicoNiveis = [...(anterior?.historicoNiveis || []), leitura.nivelPct].slice(-this.maxHistorico);
+    const historicoTimestamps = [...(anterior?.historicoTimestamps || []), leitura.timestamp].slice(-this.maxHistorico);
+    const historicoDistancias = [...(anterior?.historicoDistancias || []), leitura.distanciaCm].slice(-this.maxHistorico);
     this.canais[canal][id] = {
       bueiroId: id,
+      historicoNiveis, historicoTimestamps, historicoDistancias,
       origem: leitura.origem,
       nivelPct: leitura.nivelPct,
       alturaAguaCm: leitura.alturaAguaCm,
