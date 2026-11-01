@@ -16,7 +16,7 @@ async function gerarTextoIA(prompt, signal) {
     }),
     signal
   });
-  if (!resposta.ok) throw new Error('OpenAI indisponível: HTTP ' + resposta.status);
+  if (!resposta.ok) { const erro = new Error('OpenAI HTTP ' + resposta.status); erro.statusOpenAI = resposta.status; throw erro; }
   const dados = await resposta.json();
   const texto = dados.choices?.[0]?.message?.content?.trim();
   if (!texto) throw new Error('A OpenAI retornou uma resposta vazia.');
@@ -72,7 +72,16 @@ export default async function rotasIA(app, { ctx }) {
         } finally { clearTimeout(timer); }
       } catch (erro) {
         req.log.warn({ err: erro }, 'Falha no relatório OpenAI com fontes oficiais');
-        relatorioCache = { status: 'erro', mensagem: 'Não foi possível gerar a análise agora. Verifique as fontes e a configuração da OpenAI.' };
+        const codigo = erro.statusOpenAI;
+        const causa = codigo === 401 ? 'Chave OPENAI_API_KEY inválida ou revogada.'
+          : codigo === 429 ? 'Limite de uso ou créditos da OpenAI atingidos.'
+          : codigo === 403 ? 'Acesso ao modelo OpenAI não autorizado.'
+          : codigo === 400 ? 'A OpenAI rejeitou a solicitação; verifique o modelo configurado.'
+          : codigo >= 500 ? 'Serviço da OpenAI temporariamente indisponível.'
+          : erro.name === 'TimeoutError' || erro.name === 'AbortError' ? 'Tempo limite excedido na consulta.'
+          : erro.message?.includes('resposta vazia') ? 'A OpenAI retornou um texto vazio.'
+          : 'Falha na consulta às fontes ou à OpenAI; verifique o terminal do backend.';
+        relatorioCache = { status: 'erro', mensagem: causa, codigoOpenAI: codigo ?? null };
         proximaTentativa = Date.now() + 5 * 60_000;
       }
     })().finally(() => { analisePendente = null; });
