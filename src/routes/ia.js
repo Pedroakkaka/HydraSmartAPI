@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { coletarContextoIA } from '../services/iaFontes.js';
 /**
  * Cloudflare Workers AI interpreta apenas dados e históricos do Core.
@@ -38,13 +39,15 @@ async function gerarTextoIA(prompt, signal, config) {
   return texto;
 }
 export default async function rotasIA(app, { ctx }) {
-  // Relatório público compartilhado, cache de 5 min e memória curta de análises.
+  // Relatório compartilhado: verifica fontes a cada 30 s e só gera texto quando elas mudam.
   // Memória de análises é volátil (reinício apaga); não é treinamento do modelo.
   let relatorioCache = null;
   let proximaTentativa = 0;
   let analisePendente = null;
   const analisesAnteriores = [];
   let testeCloudflareExecutado = false;
+  let ultimaAssinaturaFontes = null;
+  const INTERVALO_VERIFICACAO_MS = 30_000;
 
   // Teste manual: exige OPERATOR_API_KEY pelo hook global, flag específica e
   // permite no máximo uma chamada ao provedor por inicialização do servidor.
@@ -84,10 +87,18 @@ export default async function rotasIA(app, { ctx }) {
     if (relatorioCache && agora < proximaTentativa) return relatorioCache;
     if (analisePendente) return relatorioCache || { status: 'processando', mensagem: 'Análise em andamento.' };
     if (agora < proximaTentativa) return relatorioCache || { status: 'aguardando', mensagem: 'Aguardando próxima análise.' };
-    proximaTentativa = agora + 5 * 60_000;
+    proximaTentativa = agora + INTERVALO_VERIFICACAO_MS;
     analisePendente = (async () => {
       try {
         const contexto = await coletarContextoIA(app, ctx);
+        const assinatura = createHash('sha256').update(JSON.stringify(contexto.fontes.map((f) => ({
+          fonte: f.fonte, tipo: f.tipo, estacao: f.estacao,
+          registros: f.registros
+        })))).digest('hex');
+        if (relatorioCache?.status === 'disponivel' && assinatura === ultimaAssinaturaFontes) {
+          relatorioCache = { ...relatorioCache, verificadoEm: new Date().toISOString(), dadosAlterados: false, desatualizado: false };
+          return;
+        }
         if (!contexto.registrosConsultados) {
           relatorioCache = { status: 'sem_dados', mensagem: 'Nenhum dado real disponível nas fontes consultadas.', fontes: [], avisosFontes: contexto.avisos, registrosConsultados: 0 };
           return;
@@ -111,9 +122,11 @@ export default async function rotasIA(app, { ctx }) {
             status: 'disponivel', analise: texto, registrosConsultados: contexto.registrosConsultados,
             fontes: contexto.fontes.map((f) => ({ fonte: f.fonte, tipo: f.tipo, estacao: f.estacao ?? null, registros: f.registros.length })),
             avisosFontes: contexto.avisos, geradoEm,
+            verificadoEm: geradoEm, dadosAlterados: true,
             memoriaAnalises: 'Contexto das últimas análises nesta execução do servidor; não há treinamento automático do modelo.',
             aviso: 'Análise consultiva de dados oficiais e históricos; não é previsão validada de alagamento.'
           };
+          ultimaAssinaturaFontes = assinatura;
           analisesAnteriores.push({ geradoEm, resumo: texto.slice(0, 1100) });
           if (analisesAnteriores.length > 3) analisesAnteriores.shift();
         } finally { clearTimeout(timer); }
@@ -133,7 +146,8 @@ export default async function rotasIA(app, { ctx }) {
         } else {
           relatorioCache = { status: 'erro', mensagem: causa, codigoCloudflare: codigo ?? null };
         }
-        proximaTentativa = Date.now() + 5 * 60_000;
+        // Falhas usam intervalo maior para não insistir no provedor e nas fontes externas.
+        proximaTentativa = Date.now() + 2 * 60_000;
       }
     })().finally(() => { analisePendente = null; });
     await analisePendente;
