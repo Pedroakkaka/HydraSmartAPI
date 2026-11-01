@@ -44,6 +44,8 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
       SERIAL_ENABLED: "false"
       INGEST_API_KEY: ${INGEST_API_KEY:-}
+      # Chave privada fornecida pelo ambiente da VPS ou arquivo .env local (nunca versionar).
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       CEMADEN_JWT_TOKEN: ${CEMADEN_JWT_TOKEN:-}
       TZ: America/Cuiaba
     ports:
