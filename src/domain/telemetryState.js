@@ -71,6 +71,13 @@ export class TelemetryState extends EventEmitter {
       errosParser: 0
     };
 
+    // Canais separados por procedência: nunca confundir bancada, cenário e campo.
+    this.canais = {
+      prototipo: {},
+      demonstracao: {},
+      campo: {}
+    };
+
     this.simulacao = {
       ativo: false,
       pausado: false,
@@ -129,6 +136,21 @@ export class TelemetryState extends EventEmitter {
 
     this._emitir('leitura');
     return { ...b };
+  }
+
+  registrarCanal(canal, id, leitura) {
+    if (!Object.hasOwn(this.canais, canal)) return;
+    this.canais[canal][id] = {
+      bueiroId: id,
+      origem: leitura.origem,
+      nivelPct: leitura.nivelPct,
+      alturaAguaCm: leitura.alturaAguaCm,
+      distanciaCm: leitura.distanciaCm,
+      risco: leitura.risco,
+      timestamp: leitura.timestamp,
+      natureza: canal === 'demonstracao' ? 'sintetico' : canal === 'prototipo' ? 'experimental' : 'campo'
+    };
+    this._emitir('canal');
   }
 
   resetarBueiros(origem = 'Aguardando leituras reais') {
@@ -201,6 +223,11 @@ export class TelemetryState extends EventEmitter {
       bueiros,
       serial: { ...this.serial },
       simulacao: { ...this.simulacao },
+      canais: Object.fromEntries(
+        Object.entries(this.canais).map(([canal, dados]) => [
+          canal, Object.fromEntries(Object.entries(dados).map(([id, leitura]) => [id, { ...leitura }]))
+        ])
+      ),
       geradoEm: Date.now()
     };
   }
