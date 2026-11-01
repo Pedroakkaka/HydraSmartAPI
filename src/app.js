@@ -85,7 +85,7 @@ export async function construirApp(ctx, { logger = false } = {}) {
   app.addHook('onRequest', async (req, reply) => {
     if (req.method !== 'POST' || req.url.split('?')[0] !== '/api/v1/ia/analisar') return;
     // Fail closed: uso pago exige chave de operador, flag explícita e chave do provedor.
-    if (!ctx.config.enablePublicAi || !ctx.config.openAiApiKey) {
+    if (!ctx.config.enablePublicAi || !ctx.config.cloudflareAccountId || !ctx.config.cloudflareApiToken) {
       return reply.code(503).send({ erro: 'Análise por IA está desativada ou sem configuração segura no servidor.' });
     }
     const now = Date.now();
