@@ -37,6 +37,11 @@ export function carregarConfig(env = process.env) {
 
     // Chave exigida no POST /api/v1/leituras (sensores em campo enviando via HTTP).
     ingestApiKey: env.INGEST_API_KEY || '',
+    operatorApiKey: env.OPERATOR_API_KEY || '',
+    openAiApiKey: env.OPENAI_API_KEY || '',
+    openAiModel: env.OPENAI_MODEL || 'gpt-4.1-mini',
+    enableAutomaticAi: bool(env.ENABLE_AUTOMATIC_AI, false),
+    enablePublicAi: bool(env.ENABLE_PUBLIC_AI, false),
     cemadenToken: env.CEMADEN_JWT_TOKEN || env.CEMADEN_TOKEN || '',
     cemadenEmail: env.CEMADEN_EMAIL || '',
     cemadenSenha: env.CEMADEN_PASSWORD || '',

@@ -3,13 +3,12 @@ import { coletarContextoIA } from '../services/iaFontes.js';
  * OpenAI é consultiva: recebe somente históricos e resultados do Core.
  * Não altera sensores, calibração, limiares ou alertas.
  */
-const MODELO = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
-async function gerarTextoIA(prompt, signal) {
+async function gerarTextoIA(prompt, signal, config) {
   const resposta = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + process.env.OPENAI_API_KEY },
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + config.openAiApiKey },
     body: JSON.stringify({
-      model: MODELO,
+      model: config.openAiModel,
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.2,
       max_completion_tokens: 1000
@@ -30,8 +29,8 @@ export default async function rotasIA(app, { ctx }) {
   let analisePendente = null;
   const analisesAnteriores = [];
   app.get('/ia/relatorio', async (req) => {
-    if (process.env.ENABLE_AUTOMATIC_AI !== 'true' || !process.env.OPENAI_API_KEY) {
-      return { status: 'indisponivel', mensagem: 'Configure OPENAI_API_KEY e ENABLE_AUTOMATIC_AI=true no servidor.' };
+    if (!ctx.config.enableAutomaticAi || !ctx.config.openAiApiKey) {
+      return { status: 'indisponivel', mensagem: 'Análise automática por IA desativada ou sem configuração segura no servidor.' };
     }
     const agora = Date.now();
     if (relatorioCache && agora < proximaTentativa) return relatorioCache;
@@ -58,7 +57,7 @@ export default async function rotasIA(app, { ctx }) {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 20000);
         try {
-          const texto = await gerarTextoIA(prompt, controller.signal);
+          const texto = await gerarTextoIA(prompt, controller.signal, ctx.config);
           const geradoEm = new Date().toISOString();
           relatorioCache = {
             status: 'disponivel', analise: texto, registrosConsultados: contexto.registrosConsultados,
@@ -104,8 +103,9 @@ export default async function rotasIA(app, { ctx }) {
       }
     }
   }, async (req, reply) => {
-    const chave = process.env.OPENAI_API_KEY;
-    if (!chave) return reply.code(503).send({ erro: 'IA indisponível: configure OPENAI_API_KEY no backend.' });
+    if (!ctx.config.openAiApiKey || !ctx.config.enablePublicAi) {
+      return reply.code(503).send({ erro: 'Análise por IA está desativada ou sem configuração segura no servidor.' });
+    }
     const { pergunta = 'Interprete as tendências observadas no histórico.', bueiroId, limite = 40 } = req.body || {};
     const leituras = await ctx.repositorios.leituras.listar({ ...(bueiroId ? { bueiroId } : {}), limite });
     const historico = Array.isArray(leituras) ? leituras : (leituras?.dados || leituras?.leituras || []);
@@ -124,7 +124,7 @@ export default async function rotasIA(app, { ctx }) {
     const controlador = new AbortController();
     const timeout = setTimeout(() => controlador.abort(), 15000);
     try {
-      const analise = await gerarTextoIA(prompt, controlador.signal);
+      const analise = await gerarTextoIA(prompt, controlador.signal, ctx.config);
       return { analise, natureza: 'interpretacao_ia', fonte: 'historico_core', registrosConsultados: historico.length, aviso: 'Interpretação consultiva; o Core permanece responsável por cálculos e alertas.' };
     } catch (erro) {
       req.log.warn({ err: erro }, 'Falha ao consultar OpenAI');

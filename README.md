@@ -1,6 +1,6 @@
 # HydraSmart API
 
-Back-end do **HydraSmart**, a plataforma de monitoramento de drenagem urbana e prevenção de alagamentos de Cáceres-MT.
+Back-end do **HydraSmart**, a plataforma de monitoramento de drenagem urbana e prevenção de alagamentos de Porto Alegre-RS.
 
 A API lê os sensores do Arduino pela USB, calcula o nível de água de cada bueiro, grava o histórico no PostgreSQL, dispara alertas críticos e envia tudo em tempo real para o painel ([HydraSmartFront](https://github.com/Pedroakkaka/HydraSmartFront)).
 

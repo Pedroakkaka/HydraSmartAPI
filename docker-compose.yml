@@ -16,7 +16,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-hydrasmart}
       POSTGRES_USER: ${POSTGRES_USER:-hydrasmart}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hydrasmart}
-      TZ: America/Cuiaba
+      TZ: America/Sao_Paulo
     ports:
       # Exposto só para a própria máquina (127.0.0.1), nunca para a internet.
       - "127.0.0.1:${DB_PORT:-5433}:5432"
@@ -45,9 +45,12 @@ services:
       SERIAL_ENABLED: "false"
       INGEST_API_KEY: ${INGEST_API_KEY:-}
       # Chave privada fornecida pelo ambiente da VPS ou arquivo .env local (nunca versionar).
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
+      ENABLE_AUTOMATIC_AI: ${ENABLE_AUTOMATIC_AI:-false}
+      ENABLE_PUBLIC_AI: ${ENABLE_PUBLIC_AI:-false}
       CEMADEN_JWT_TOKEN: ${CEMADEN_JWT_TOKEN:-}
-      TZ: America/Cuiaba
+      TZ: America/Sao_Paulo
     ports:
       - "127.0.0.1:${API_PORT:-3333}:3333"
     networks: [hydrasmart]

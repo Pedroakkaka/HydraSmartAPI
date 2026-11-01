@@ -66,13 +66,12 @@ export async function construirApp(ctx, { logger = false } = {}) {
 
   // Proteção das rotas de escrita antes de disponibilizar a API via túnel HTTPS.
   // Chave de operador exclusiva do backend; nunca incluí-la no bundle público do React.
-  const operatorKey = process.env.OPERATOR_API_KEY;
+  const operatorKey = ctx.config.operatorApiKey;
   app.addHook('onRequest', async (req, reply) => {
     const path = req.url.split('?')[0];
     const isMutation = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method);
     const isIngest = req.method === 'POST' && path === '/api/v1/leituras';
-    const isAI = req.method === 'POST' && path === '/api/v1/ia/analisar';
-    if (!isMutation || isIngest || isAI || !path.startsWith('/api/v1/')) return;
+    if (!isMutation || isIngest || !path.startsWith('/api/v1/')) return;
     if (!operatorKey) return reply.code(503).send({ erro: 'Operações administrativas desabilitadas: configure OPERATOR_API_KEY no backend.' });
     const provided = req.headers['x-operator-key'];
     if (typeof provided !== 'string' || provided !== operatorKey) {
@@ -80,15 +79,14 @@ export async function construirApp(ctx, { logger = false } = {}) {
     }
   });
 
-  // Limite básico de consumo da IA por endereço de origem; não substitui
-  // autenticação e cotas no provedor Gemini.
+  // Limite básico adicional por endereço de origem; a rota também exige
+  // autenticação de operador e ativação explícita no backend.
   const aiHits = new Map();
   app.addHook('onRequest', async (req, reply) => {
     if (req.method !== 'POST' || req.url.split('?')[0] !== '/api/v1/ia/analisar') return;
-    // Fail closed: uma API pública não pode oferecer consumo livre da chave Gemini.
-    // A IA só é reativada após implementar autenticação segura do lado do servidor.
-    if (process.env.ENABLE_PUBLIC_AI !== 'true') {
-      return reply.code(503).send({ erro: 'Análise por IA temporariamente desabilitada para proteger a chave Gemini.' });
+    // Fail closed: uso pago exige chave de operador, flag explícita e chave do provedor.
+    if (!ctx.config.enablePublicAi || !ctx.config.openAiApiKey) {
+      return reply.code(503).send({ erro: 'Análise por IA está desativada ou sem configuração segura no servidor.' });
     }
     const now = Date.now();
     const key = req.ip;
