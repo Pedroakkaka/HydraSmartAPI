@@ -38,7 +38,7 @@ async function gerarTextoIA(prompt, signal, config) {
   return texto;
 }
 export default async function rotasIA(app, { ctx }) {
-  // Relatório compartilhado, cache de 30 min e memória curta de análises.
+  // Relatório público compartilhado, cache de 5 min e memória curta de análises.
   // Memória de análises é volátil (reinício apaga); não é treinamento do modelo.
   let relatorioCache = null;
   let proximaTentativa = 0;
@@ -84,7 +84,7 @@ export default async function rotasIA(app, { ctx }) {
     if (relatorioCache && agora < proximaTentativa) return relatorioCache;
     if (analisePendente) return relatorioCache || { status: 'processando', mensagem: 'Análise em andamento.' };
     if (agora < proximaTentativa) return relatorioCache || { status: 'aguardando', mensagem: 'Aguardando próxima análise.' };
-    proximaTentativa = agora + 30 * 60_000;
+    proximaTentativa = agora + 5 * 60_000;
     analisePendente = (async () => {
       try {
         const contexto = await coletarContextoIA(app, ctx);
@@ -101,7 +101,7 @@ export default async function rotasIA(app, { ctx }) {
           'A IA não altera o Core nem determina alertas. Histórico de relatórios não é treinamento ou aprendizado de pesos do modelo.',
           'Contexto real (JSON): ' + JSON.stringify(contexto.fontes).slice(0, 45000),
           'Relatórios anteriores (somente contexto, não fonte de medição): ' + JSON.stringify(analisesAnteriores).slice(0, 3500)
-        ].join('\\n');
+        ].join('\n');
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 20000);
         try {
@@ -128,7 +128,11 @@ export default async function rotasIA(app, { ctx }) {
           : erro.name === 'TimeoutError' || erro.name === 'AbortError' ? 'Tempo limite excedido na consulta.'
           : erro.message?.includes('resposta vazia') ? 'A Cloudflare retornou um texto vazio.'
           : 'Falha na consulta às fontes ou à Cloudflare; verifique o terminal do backend.';
-        relatorioCache = { status: 'erro', mensagem: causa, codigoCloudflare: codigo ?? null };
+        if (relatorioCache?.status === 'disponivel') {
+          relatorioCache = { ...relatorioCache, desatualizado: true, avisoAtualizacao: causa };
+        } else {
+          relatorioCache = { status: 'erro', mensagem: causa, codigoCloudflare: codigo ?? null };
+        }
         proximaTentativa = Date.now() + 5 * 60_000;
       }
     })().finally(() => { analisePendente = null; });
