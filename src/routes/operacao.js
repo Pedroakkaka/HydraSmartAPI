@@ -95,6 +95,15 @@ export default async function rotasOperacao(app, { ctx }) {
     return ctx.snapshotCompleto();
   });
 
+  // ---------------- Receptor estritamente interno de testes ----------------
+  app.get('/defesa-civil/simulador', {
+    schema: { tags: ['Simulação'], summary: 'Recibos internos de alerta; nenhuma transmissão externa' }
+  }, async () => ({
+    simulacao: true,
+    transmissaoExterna: false,
+    registros: ctx.simuladorDefesaCivil?.listar() || []
+  }));
+
   // ---------------- Alertas ----------------
   app.get('/alertas', {
     schema: {
