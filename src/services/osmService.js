@@ -1,12 +1,12 @@
 /**
- * Elementos de drenagem reais do OpenStreetMap em Porto Alegre (via Overpass API),
+ * Elementos de drenagem reais do OpenStreetMap em Cáceres-MT (via Overpass API),
  * consultados pelo servidor com cache de 6 horas e servidores alternativos.
  */
 
 import { CacheTtl } from './cacheTtl.js';
 
-// Área aproximada de Porto Alegre. Não representa cadastro municipal completo.
-const BBOX = '-30.27,-51.31,-29.93,-51.03';
+// Área aproximada de Cáceres-MT. Não representa cadastro municipal completo.
+const BBOX = '-16.18,-57.80,-15.97,-57.56';
 const CONSULTA = `[out:json][timeout:15];(node["manhole"="drain"](${BBOX});node["manhole"="storm_drain"](${BBOX});node["waterway"="drain"](${BBOX});way["waterway"="drain"](${BBOX}););out center 2000;`;
 const SERVIDORES = [
   'https://overpass-api.de/api/interpreter',
@@ -76,7 +76,7 @@ export class OsmService {
 
         return {
           status: 'sucesso',
-          mensagem: `${elementos.length} elementos de drenagem cadastrados no OpenStreetMap para Porto Alegre (cobertura não exaustiva).`,
+          mensagem: `${elementos.length} elementos de drenagem cadastrados no OpenStreetMap para Cáceres-MT (cobertura não exaustiva).`,
           fonte: servidor,
           elementos,
           consultadoEm: new Date().toISOString()
