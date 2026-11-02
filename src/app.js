@@ -70,7 +70,7 @@ export async function construirApp(ctx, { logger = false } = {}) {
   app.addHook('onRequest', async (req, reply) => {
     const path = req.url.split('?')[0];
     const isMutation = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method);
-    const isIngest = req.method === 'POST' && path === '/api/v1/leituras';
+    const isIngest = req.method === 'POST' && (path === '/api/v1/leituras' || path === '/api/v1/leituras/prototipo');
     if (!isMutation || isIngest || !path.startsWith('/api/v1/')) return;
     if (!operatorKey) return reply.code(503).send({ erro: 'Operações administrativas desabilitadas: configure OPERATOR_API_KEY no backend.' });
     const provided = req.headers['x-operator-key'];
