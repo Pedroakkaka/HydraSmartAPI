@@ -13,6 +13,7 @@ export const TREND_THRESHOLDS = {
   AMOSTRAS_MINIMAS_PREVISAO: 5,
   DURACAO_MINIMA_SERIE_MS: 20_000,
   IDADE_MAXIMA_AMOSTRA_MS: 15_000,
+  JANELA_RECENTE_MS: 60_000,
   VARIABILIDADE_MAXIMA_TAXA: 0.35
 };
 
@@ -97,8 +98,13 @@ export class CoreCalculator {
    * sujeitos a calibração por validação em campo.
    */
   static avaliarConfiabilidadeSerie(niveis, timestampsMs, agoraMs = Date.now()) {
-    const { niveis: n, timestamps: t, pontosValidos } =
-      DataValidator.higienizarSerieTemporal(niveis, timestampsMs);
+    const limpos = DataValidator.higienizarSerieTemporal(niveis, timestampsMs);
+    // Use apenas uma janela recente; oscilações antigas não bloqueiam a recuperação.
+    const pares = limpos.timestamps.map((timestamp, i) => ({ timestamp, nivel: limpos.niveis[i] }))
+      .filter((p) => p.timestamp <= agoraMs && p.timestamp >= agoraMs - TREND_THRESHOLDS.JANELA_RECENTE_MS);
+    const n = pares.map((p) => p.nivel);
+    const t = pares.map((p) => p.timestamp);
+    const pontosValidos = pares.length;
     const rejeitar = (motivo) => ({ confiavel: false, motivo, amostras: pontosValidos });
     if (pontosValidos < TREND_THRESHOLDS.AMOSTRAS_MINIMAS_PREVISAO) {
       return rejeitar('Amostras insuficientes para previsão');
@@ -187,10 +193,12 @@ export class CoreCalculator {
     }
 
     return {
-      minutosEstimados: minutos,
-      alcancavel: true,
+      minutosEstimados: qualidade.confiavel ? minutos : null,
+      alcancavel: qualidade.confiavel,
       confiavel: qualidade.confiavel,
-      motivo: `Projeção linear determinística: ${minutos} min a +${taxaMinuto.toFixed(2)}%/min. ${qualidade.motivo}`
+      motivo: qualidade.confiavel
+        ? `Projeção linear determinística: ${minutos} min a +${taxaMinuto.toFixed(2)}%/min. ${qualidade.motivo}`
+        : `Previsão suspensa: ${qualidade.motivo}`
     };
   }
 
