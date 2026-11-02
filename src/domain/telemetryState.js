@@ -34,8 +34,8 @@ function bueiroVazio(cfg, origem = 'Nenhum dado recebido') {
     timestamp: null,
     taxaVariacaoMinuto: 0,
     confiabilidadeTendencia: { confiavel: false, motivo: 'Aguardando amostras suficientes', amostras: 0 },
-    tendencia: 'estavel',
-    risco: 'normal',
+    tendencia: 'indeterminado',
+    risco: 'desconhecido',
     historicoNiveis: [],
     historicoTimestamps: [],
     historicoDistancias: []
@@ -152,7 +152,10 @@ export class TelemetryState extends EventEmitter {
     this.serial = { ...this.serial, ...parcial };
     if (!this.serial.conectado) {
       for (const b of Object.values(this.bueiros)) {
-        if (b.origem === 'Arduino USB') b.desatualizado = true;
+        if (b.origem === 'Arduino USB') {
+          b.desatualizado = true;
+          b.confiabilidadeTendencia = { confiavel: false, motivo: 'Arduino desconectado', amostras: b.historicoNiveis.length };
+        }
       }
     }
     this._emitir('serial');
