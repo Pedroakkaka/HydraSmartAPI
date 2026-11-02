@@ -1,17 +1,17 @@
 /**
- * Integração CEMADEN para Porto Alegre-RS.
+ * Integração CEMADEN para Cáceres-MT.
  * Tokens e credenciais permanecem exclusivamente no backend.
  * O SGAA emite tokens com validade curta; renovação sob demanda e em 401.
  */
 import { CacheTtl, buscarJson } from './cacheTtl.js';
 
-const URL_DADOS = 'https://sws.cemaden.gov.br/PED/api/pcds/pcds-dados-recentes?uf=RS&rede=11';
+const URL_DADOS = 'https://sws.cemaden.gov.br/PED/api/pcds/pcds-dados-recentes?uf=MT&rede=11';
 const URL_TOKEN = 'https://sgaa.cemaden.gov.br/SGAA/rest/controle-token/tokens';
 const normalizar = (v) => String(v ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toUpperCase();
-const estaEmPortoAlegre = (r) => {
+const estaEmCaceres = (r) => {
   const cidade = r.cidade ?? r.municipio ?? r.nomeMunicipio ?? r.nome_municipio ?? r.nomeCidade;
   const codigo = r.codigoIbge ?? r.codIbge ?? r.codigo_ibge ?? r.codMunicipio;
-  return normalizar(cidade) === 'PORTO ALEGRE' || String(codigo ?? '') === '4314902';
+  return normalizar(cidade) === 'CACERES' || String(codigo ?? '') === '5102504';
 };
 
 export class CemadenService {
@@ -52,7 +52,7 @@ export class CemadenService {
 
   async _consultar() {
     const base = {
-      metadados: { cidade: 'Porto Alegre', uf: 'RS', estacaoCodigo: null, estacaoNome: 'Estações verificadas na consulta' },
+      metadados: { cidade: 'Cáceres', uf: 'MT', estacaoCodigo: null, estacaoNome: 'Estações verificadas na consulta' },
       ultimaConsulta: new Date().toISOString(), dadosEstacaoPortoAlegre: null
     };
     if (!this.token && !(this.email && this.senha)) {
@@ -73,17 +73,17 @@ export class CemadenService {
         data = await buscarJson(URL_DADOS, { timeoutMs: 12000,
           headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' } });
       }
-      // Nunca rotular estações de outras cidades como dados de Porto Alegre.
+      // Nunca rotular estações de outras cidades como dados de Cáceres.
       const registros = Array.isArray(data) ? data
         : Array.isArray(data?.dados) ? data.dados
         : Array.isArray(data?.data) ? data.data : null;
       if (!registros) return { ...base, autenticado: true, status: 'sem_dados_recentes',
         mensagem: 'Resposta do CEMADEN sem lista reconhecida de estações; verificar formato do endpoint.' };
-      const lista = registros.filter(estaEmPortoAlegre);
+      const lista = registros.filter(estaEmCaceres);
       return { ...base, autenticado: true, status: lista.length ? 'sucesso' : 'sem_dados_recentes',
-        metadados: { ...base.metadados, estacaoNome: lista.length ? lista.length + ' registro(s) de Porto Alegre' : 'Nenhuma estação confirmada' },
+        metadados: { ...base.metadados, estacaoNome: lista.length ? lista.length + ' registro(s) de Cáceres' : 'Nenhuma estação confirmada' },
         dadosEstacaoPortoAlegre: lista.length ? lista : null,
-        mensagem: lista.length ? 'Registros identificados para Porto Alegre-RS.' : 'Nenhum registro recente identificado para Porto Alegre-RS.' };
+        mensagem: lista.length ? 'Registros identificados para Cáceres-MT.' : 'Nenhum registro recente identificado para Cáceres-MT.' };
     } catch (err) {
       this.log?.warn?.({ status: err.status, message: err.message }, 'Consulta CEMADEN falhou');
       return { ...base, autenticado: false,
