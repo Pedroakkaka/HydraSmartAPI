@@ -87,3 +87,31 @@ test('sanitizarParametros aplica travas físicas', () => {
   assert.equal(r.limiteCriticoPct, 75, 'crítico sempre pelo menos 5 pontos acima da atenção');
   assert.equal(sanitizarParametros(cfg, {}).alturaTotalCm, 20, 'campos ausentes mantêm o valor atual');
 });
+
+test('Previsão rejeita séries com poucas amostras', () => {
+  const agora = 1_800_000_000_000;
+  const serie = { niveis: [50, 51], timestamps: [agora - 5000, agora], agoraMs: agora };
+  assert.equal(CoreCalculator.avaliarConfiabilidadeSerie(serie.niveis, serie.timestamps, agora).confiavel, false);
+  const p = CoreCalculator.estimarTempoAteLimiar(51, 2, 80, serie);
+  assert.equal(p.confiavel, false);
+  assert.equal(p.alcancavel, true);
+});
+
+test('Previsão valida elevação estável e rejeita oscilações', () => {
+  const agora = 1_800_000_000_000;
+  const timestamps = Array.from({ length: 5 }, (_, i) => agora - 20000 + i * 5000);
+  const estavel = { niveis: [50, 51, 52, 53, 54], timestamps, agoraMs: agora };
+  const oscilante = { ...estavel, niveis: [50, 54, 51, 56, 54] };
+  assert.equal(CoreCalculator.avaliarConfiabilidadeSerie(estavel.niveis, timestamps, agora).confiavel, true);
+  assert.equal(CoreCalculator.estimarTempoAteLimiar(54, 12, 80, estavel).confiavel, true);
+  assert.equal(CoreCalculator.avaliarConfiabilidadeSerie(oscilante.niveis, timestamps, agora).confiavel, false);
+  assert.equal(CoreCalculator.estimarTempoAteLimiar(54, 12, 80, oscilante).confiavel, false);
+});
+
+test('Previsão rejeita leituras antigas e timestamps repetidos', () => {
+  const agora = 1_800_000_000_000;
+  const tempos = Array.from({ length: 5 }, (_, i) => agora - 50000 + i * 5000);
+  assert.equal(CoreCalculator.avaliarConfiabilidadeSerie([50,51,52,53,54], tempos, agora).confiavel, false);
+  assert.equal(CoreCalculator.avaliarConfiabilidadeSerie([50,51,52,53,54], [agora - 20000, agora - 15000, agora - 10000, agora, agora], agora).confiavel, false);
+  assert.equal(CoreCalculator.estimarTempoAteLimiar(60, 2, 80).confiavel, false);
+});
