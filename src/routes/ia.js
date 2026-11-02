@@ -154,6 +154,86 @@ export default async function rotasIA(app, { ctx }) {
     return relatorioCache;
   });
 
+
+  // Relatório generativo compartilhado: a mesma Cloudflare AI para os dois modos,
+  // com dados selecionados somente pelo servidor e sem misturar fontes.
+  const contextuais = new Map();
+  const emAndamento = new Map();
+  app.get('/ia/relatorio-contextual', {
+    schema: {
+      tags: ['Inteligência artificial'],
+      querystring: {
+        type: 'object', additionalProperties: false,
+        properties: { modo: { type: 'string', enum: ['prototipo', 'real'] } }
+      }
+    }
+  }, async (req) => {
+    const modo = req.query.modo === 'prototipo' ? 'prototipo' : 'real';
+    const agora = Date.now();
+    if (modo === 'prototipo') {
+      const ativos = Object.values(ctx.snapshotCompleto().canais?.prototipo || {}).filter(b =>
+        b?.valido === true && !b.desatualizado &&
+        Number.isFinite(Number(b.timestamp)) &&
+        Number(b.timestamp) <= agora + 5000 && agora - Number(b.timestamp) <= 15000
+      );
+      if (!ativos.length) return { status: 'sem_dados', modo, mensagem: 'Aguardando leituras recentes enviadas pelo Arduino.', fontes: [] };
+    }
+    if (!ctx.config.enableAutomaticAi || !ctx.config.cloudflareApiToken) {
+      return { status: 'indisponivel', modo, mensagem: 'IA generativa desativada ou não configurada no servidor; análise do Core permanece ativa.', fontes: [] };
+    }
+    const cache = contextuais.get(modo);
+    if (cache && agora < cache.expira) return cache.valor;
+    if (emAndamento.has(modo)) return cache?.valor || { status: 'processando', modo, mensagem: 'Análise em andamento.' };
+    const executar = (async () => {
+      try {
+        let fontes;
+        if (modo === 'prototipo') {
+          const canal = ctx.snapshotCompleto().canais?.prototipo || {};
+          const registros = Object.values(canal).filter(b => b?.valido === true &&
+            Number.isFinite(Number(b.timestamp)) && Date.now() - Number(b.timestamp) <= 15000 &&
+            Number(b.timestamp) <= Date.now() + 5000).map(b => ({
+            bueiroId: b.bueiroId, origem: 'Arduino USB / protótipo experimental',
+            nivelPct: b.nivelPct, risco: b.risco, tendencia: b.tendencia,
+            timestamp: b.timestamp, confiabilidadeTendencia: b.confiabilidadeTendencia
+          }));
+          fontes = [{ fonte: 'Arduino HydraSmart', tipo: 'leitura física experimental', registros }];
+        } else {
+          const contexto = await coletarContextoIA(app, ctx);
+          fontes = contexto.fontes;
+        }
+        if (!fontes.some(f => f.registros?.length)) return { status: 'sem_dados', modo, mensagem: 'Aguardando dados válidos.', fontes: [] };
+        const prompt = [
+          'Atue como analista consultivo HydraSmart de Porto Alegre-RS.',
+          'Interprete apenas os registros; o Core define riscos e alertas. Não invente previsões nem medições.',
+          modo === 'prototipo'
+            ? 'Estas medições são do protótipo físico, não de bueiros urbanos reais. Não atribua condições de Porto Alegre à bancada.'
+            : 'São dados oficiais e de campo: não confunda nível de estação hidrológica com nível de bueiro.',
+          'Descreva tendências observadas, dados disponíveis e limitações em até três parágrafos.',
+          JSON.stringify(fontes).slice(0, 25000)
+        ].join('\\n');
+        const controlador = new AbortController();
+        const timer = setTimeout(() => controlador.abort(), 20000);
+        try {
+          const analise = await gerarTextoIA(prompt, controlador.signal, ctx.config);
+          const valor = { status: 'disponivel', modo, analise,
+            geradoEm: new Date().toISOString(), fontes: fontes.map(f => ({
+              fonte: f.fonte, tipo: f.tipo, registros: f.registros.length
+            })),
+            aviso: 'Análise consultiva, sem alteração de risco ou alertas.' };
+          contextuais.set(modo, { valor, expira: Date.now() + 30 * 60_000 });
+          return valor;
+        } finally { clearTimeout(timer); }
+      } catch (erro) {
+        req.log.warn({ modo, err: erro }, 'Falha na IA contextual');
+        const valor = { status: 'erro', modo, mensagem: 'Análise generativa temporariamente indisponível.' };
+        contextuais.set(modo, { valor, expira: Date.now() + 60_000 });
+        return valor;
+      }
+    })();
+    emAndamento.set(modo, executar);
+    try { return await executar; } finally { emAndamento.delete(modo); }
+  });
+
   app.post('/ia/analisar', {
     schema: {
       tags: ['Inteligência artificial'],
