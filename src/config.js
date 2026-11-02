@@ -42,10 +42,10 @@ export function carregarConfig(env = process.env) {
     cemadenSenha: env.CEMADEN_PASSWORD || '',
 
     municipio: {
-      nome: env.MUNICIPIO_NOME || 'Cáceres - MT',
-      latitude: Number(env.MUNICIPIO_LATITUDE ?? -16.0718),
-      longitude: Number(env.MUNICIPIO_LONGITUDE ?? -57.6789),
-      timezone: env.MUNICIPIO_TIMEZONE || 'America/Cuiaba'
+      nome: env.MUNICIPIO_NOME || 'Porto Alegre - RS',
+      latitude: Number(env.MUNICIPIO_LATITUDE ?? -30.0346),
+      longitude: Number(env.MUNICIPIO_LONGITUDE ?? -51.2177),
+      timezone: env.MUNICIPIO_TIMEZONE || 'America/Sao_Paulo'
     },
 
     historicoMemoriaAmostras: 50
