@@ -104,6 +104,10 @@ curl -X POST http://SEU-SERVIDOR/api/v1/leituras \
   -d '{"bueiroId": 1, "distanciaCm": 14.5}'
 ```
 
+## Enviar o Arduino local para a API no Render
+
+Para receber **dados experimentais físicos** de uma placa ligada ao USB de um notebook (e acionar as notificações experimentais automáticas), execute a ponte autenticada descrita em [docs/PONTE_ARDUINO_RENDER.md](docs/PONTE_ARDUINO_RENDER.md). É necessária a chave de ambiente `PROTOTYPE_INGEST_API_KEY` no Render e no notebook. A API hospedada na nuvem não consegue acessar diretamente o USB do notebook; não exponha o segredo no navegador.
+
 ## Firmware do Arduino
 
 O firmware está em [`firmware/hydrasmart_firmware.ino`](firmware/hydrasmart_firmware.ino). Ele envia uma linha JSON por sensor a cada segundo, em 115200 baud:
