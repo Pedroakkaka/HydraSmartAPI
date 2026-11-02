@@ -89,6 +89,97 @@ export default async function rotasIA(app, { ctx }) {
     return relatorioCache;
   });
 
+  // Mesmo modelo generativo para as duas origens; dados vêm apenas do servidor.
+  // Cada modo possui cache independente e nenhuma solicitação externa ocorre
+  // sem a habilitação explícita da IA e sua credencial.
+  const cachePorModo = new Map();
+  const pendenciasPorModo = new Map();
+  app.get('/ia/relatorio-contextual', {
+    schema: {
+      tags: ['Inteligência artificial'],
+      querystring: {
+        type: 'object', additionalProperties: false,
+        properties: { modo: { type: 'string', enum: ['prototipo', 'real'] } }
+      }
+    }
+  }, async (req) => {
+    const modo = req.query.modo === 'prototipo' ? 'prototipo' : 'real';
+    const agora = Date.now();
+    if (process.env.ENABLE_AUTOMATIC_AI !== 'true' || !process.env.OPENAI_API_KEY) {
+      return { status: 'indisponivel', modo, mensagem: 'IA generativa desativada no servidor; a análise determinística permanece disponível.' };
+    }
+    const anterior = cachePorModo.get(modo);
+    if (anterior && agora < anterior.expiraEm) return anterior.resposta;
+    if (pendenciasPorModo.has(modo)) return anterior?.resposta || { status: 'processando', modo };
+    const tarefa = (async () => {
+      try {
+        let fontes;
+        if (modo === 'prototipo') {
+          // Nunca aceite leituras artificiais enviadas pelo cliente; use o
+          // canal de telemetria experimental mantido pelo próprio servidor.
+          const snapshot = ctx.snapshotCompleto();
+          const canal = snapshot.canais?.prototipo || {};
+          const registros = Object.values(canal).filter((b) =>
+            b && b.valido !== false && Number.isFinite(Number(b.nivelPct)) &&
+            Number.isFinite(Number(b.timestamp)) && agora - Number(b.timestamp) <= 30000 &&
+            Number(b.timestamp) <= agora + 5000
+          ).map((b) => ({
+            id: b.id || b.bueiroId || null, nivelPct: Number(b.nivelPct),
+            risco: b.risco || null, tendencia: b.tendencia || null,
+            timestamp: b.timestamp, confiabilidadeTendencia: b.confiabilidadeTendencia || null
+          }));
+          if (!registros.length) {
+            const resposta = { status: 'sem_dados', modo, mensagem: 'Aguardando leituras atuais do protótipo; não é possível gerar interpretação.', fontes: [] };
+            cachePorModo.set(modo, { resposta, expiraEm: agora + 5000 });
+            return resposta;
+          }
+          fontes = [{ fonte: 'Protótipo HydraSmart', tipo: 'experimental', registros }];
+        } else {
+          const contexto = await coletarContextoIA(app, ctx);
+          if (!contexto.registrosConsultados) {
+            const resposta = { status: 'sem_dados', modo, mensagem: 'Sem dados reais suficientes.', fontes: [] };
+            cachePorModo.set(modo, { resposta, expiraEm: agora + 5000 });
+            return resposta;
+          }
+          fontes = contexto.fontes;
+        }
+        const prompt = [
+          'Você é o analista consultivo do HydraSmart, Porto Alegre-RS.',
+          'Use EXATAMENTE os dados fornecidos, sem inventar medições, probabilidades, locais ou alertas.',
+          'A classificação de risco e os alertas pertencem exclusivamente ao Core; você apenas interpreta.',
+          modo === 'prototipo'
+            ? 'MODO PROTÓTIPO: dados experimentais/simulados, jamais os apresente como situação real de Porto Alegre.'
+            : 'MODO REAL: identifique fontes e datas; dados de estações hidrológicas não equivalem a níveis de bueiros.',
+          'Explique nível, tendência, limitações e a necessidade de validação em campo. Responda em português brasileiro, em até três parágrafos.',
+          'Dados da fonte selecionada (JSON): ' + JSON.stringify(fontes).slice(0, 25000)
+        ].join('\\n');
+        const controlador = new AbortController();
+        const limite = setTimeout(() => controlador.abort(), 20000);
+        try {
+          const analise = await gerarTextoIA(prompt, controlador.signal);
+          const resposta = {
+            status: 'disponivel', modo, analise, geradoEm: new Date().toISOString(),
+            fontes: fontes.map(f => ({ fonte: f.fonte, tipo: f.tipo, registros: f.registros.length })),
+            aviso: modo === 'prototipo'
+              ? 'Análise generativa de demonstração; não representa medições reais nem envia alertas externos.'
+              : 'Análise consultiva de fontes reais, não é previsão hidrológica validada.'
+          };
+          cachePorModo.set(modo, { resposta, expiraEm: Date.now() + 30 * 60000 });
+          return resposta;
+        } finally {
+          clearTimeout(limite);
+        }
+      } catch (erro) {
+        req.log.warn({ err: erro, modo }, 'Falha na análise generativa contextual');
+        const resposta = { status: 'erro', modo, mensagem: 'Não foi possível atualizar a análise generativa.' };
+        cachePorModo.set(modo, { resposta, expiraEm: Date.now() + 60000 });
+        return resposta;
+      }
+    })();
+    pendenciasPorModo.set(modo, tarefa);
+    try { return await tarefa; } finally { pendenciasPorModo.delete(modo); }
+  });
+
   app.post('/ia/analisar', {
     schema: {
       tags: ['Inteligência artificial'],
