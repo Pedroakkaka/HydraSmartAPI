@@ -118,13 +118,16 @@ export default async function rotasIA(app, { ctx }) {
           // Nunca aceite leituras artificiais enviadas pelo cliente; use o
           // canal de telemetria experimental mantido pelo próprio servidor.
           const snapshot = ctx.snapshotCompleto();
-          const canal = snapshot.canais?.prototipo || {};
+          const canal = snapshot.canais?.prototipo || snapshot.bueiros || {};
+          // O backend legado fornece bueiros diretamente; versões novas
+          // podem expor canais isolados por origem.
           const registros = Object.values(canal).filter((b) =>
-            b && b.valido !== false && Number.isFinite(Number(b.nivelPct)) &&
+            b && b.valido === true && !b.desatualizado && Number.isFinite(Number(b.nivelPct)) &&
             Number.isFinite(Number(b.timestamp)) && agora - Number(b.timestamp) <= 30000 &&
             Number(b.timestamp) <= agora + 5000
           ).map((b) => ({
             id: b.id || b.bueiroId || null, nivelPct: Number(b.nivelPct),
+            origem: b.origem || 'Protótipo experimental',
             risco: b.risco || null, tendencia: b.tendencia || null,
             timestamp: b.timestamp, confiabilidadeTendencia: b.confiabilidadeTendencia || null
           }));
