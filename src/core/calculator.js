@@ -9,7 +9,11 @@ import { RISK_THRESHOLDS } from './riskRules.js';
 
 export const TREND_THRESHOLDS = {
   VELOCIDADE_MINIMA_VARIACAO: 0.05, // % por minuto
-  LIMITE_HORAS_MAX_TTE: 24 // Projeções acima de 24h são marcadas como baixa sensibilidade
+  LIMITE_HORAS_MAX_TTE: 24, // Projeções acima de 24h são marcadas como baixa sensibilidade
+  AMOSTRAS_MINIMAS_PREVISAO: 5,
+  DURACAO_MINIMA_SERIE_MS: 20_000,
+  IDADE_MAXIMA_AMOSTRA_MS: 15_000,
+  VARIABILIDADE_MAXIMA_TAXA: 0.35
 };
 
 export class CoreCalculator {
@@ -88,6 +92,43 @@ export class CoreCalculator {
   }
 
   /**
+   * Verifica quantidade, atualidade e estabilidade das leituras antes de
+   * atribuir confiança a uma projeção. Limiares operacionais conservadores,
+   * sujeitos a calibração por validação em campo.
+   */
+  static avaliarConfiabilidadeSerie(niveis, timestampsMs, agoraMs = Date.now()) {
+    const { niveis: n, timestamps: t, pontosValidos } =
+      DataValidator.higienizarSerieTemporal(niveis, timestampsMs);
+    const rejeitar = (motivo) => ({ confiavel: false, motivo, amostras: pontosValidos });
+    if (pontosValidos < TREND_THRESHOLDS.AMOSTRAS_MINIMAS_PREVISAO) {
+      return rejeitar('Amostras insuficientes para previsão');
+    }
+    if (new Set(t).size !== t.length) return rejeitar('Timestamps duplicados');
+    const idade = agoraMs - t[t.length - 1];
+    if (!Number.isFinite(idade) || idade < 0 || idade > TREND_THRESHOLDS.IDADE_MAXIMA_AMOSTRA_MS) {
+      return rejeitar('Leitura mais recente ausente, futura ou desatualizada');
+    }
+    if (t[t.length - 1] - t[0] < TREND_THRESHOLDS.DURACAO_MINIMA_SERIE_MS) {
+      return rejeitar('Janela temporal curta demais para previsão');
+    }
+    const taxas = [];
+    for (let i = 1; i < t.length; i++) {
+      const minutos = (t[i] - t[i - 1]) / 60000;
+      if (minutos <= 0) return rejeitar('Intervalos de leitura inválidos');
+      taxas.push((n[i] - n[i - 1]) / minutos);
+    }
+    const media = taxas.reduce((a, b) => a + b, 0) / taxas.length;
+    if (media <= TREND_THRESHOLDS.VELOCIDADE_MINIMA_VARIACAO) {
+      return rejeitar('Sem elevação sustentada para extrapolação');
+    }
+    const desvio = Math.sqrt(taxas.reduce((s, v) => s + (v - media) ** 2, 0) / taxas.length);
+    if (desvio / media > TREND_THRESHOLDS.VARIABILIDADE_MAXIMA_TAXA) {
+      return rejeitar('Velocidade de elevação instável');
+    }
+    return { confiavel: true, motivo: 'Série recente, suficiente e com elevação estável', amostras: pontosValidos };
+  }
+
+  /**
    * Projeta tempo linear até atingir um limiar determinístico (ex: 80% crítico ou 100% transbordo).
    * Retorna minutos até o evento ou null caso a cota esteja em recessão/estabilidade.
    * @param {number} nivelAtual
@@ -100,7 +141,10 @@ export class CoreCalculator {
    *   motivo: string
    * }}
    */
-  static estimarTempoAteLimiar(nivelAtual, taxaMinuto, nivelAlvo = RISK_THRESHOLDS.LIMITE_CRITICO_MIN) {
+  static estimarTempoAteLimiar(nivelAtual, taxaMinuto, nivelAlvo = RISK_THRESHOLDS.LIMITE_CRITICO_MIN, serie = null) {
+    const qualidade = serie
+      ? this.avaliarConfiabilidadeSerie(serie.niveis, serie.timestamps, serie.agoraMs ?? Date.now())
+      : { confiavel: false, motivo: 'Sem série temporal para validar a previsão' };
     const n = DataValidator.normalizarNivel(nivelAtual);
     if (n === null) {
       return {
@@ -115,7 +159,7 @@ export class CoreCalculator {
       return {
         minutosEstimados: 0.0,
         alcancavel: true,
-        confiavel: true,
+        confiavel: false,
         motivo: `Limiar de ${nivelAlvo}% já atingido ou superado (${n}%)`
       };
     }
@@ -124,7 +168,7 @@ export class CoreCalculator {
       return {
         minutosEstimados: null,
         alcancavel: false,
-        confiavel: true,
+        confiavel: false,
         motivo: 'Cota em recessão ou estável (sem risco iminente de elevação)'
       };
     }
@@ -145,8 +189,8 @@ export class CoreCalculator {
     return {
       minutosEstimados: minutos,
       alcancavel: true,
-      confiavel: true,
-      motivo: `Projeção linear determinística: ${minutos} min a +${taxaMinuto.toFixed(2)}%/min`
+      confiavel: qualidade.confiavel,
+      motivo: `Projeção linear determinística: ${minutos} min a +${taxaMinuto.toFixed(2)}%/min. ${qualidade.motivo}`
     };
   }
 
