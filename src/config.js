@@ -37,6 +37,8 @@ export function carregarConfig(env = process.env) {
 
     // Chave exigida no POST /api/v1/leituras (sensores em campo enviando via HTTP).
     ingestApiKey: env.INGEST_API_KEY || '',
+    // Exclusiva da ponte USB local para o canal experimental. Nunca enviar ao navegador.
+    prototypeIngestApiKey: env.PROTOTYPE_INGEST_API_KEY || '',
     operatorApiKey: env.OPERATOR_API_KEY || '',
     // Cloudflare Workers AI: credenciais apenas no backend.
     cloudflareAccountId: env.CLOUDFLARE_ACCOUNT_ID || '',
