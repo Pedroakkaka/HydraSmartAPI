@@ -100,7 +100,7 @@ export async function criarContexto({ config, repositorios, log }) {
     calibracao,
 
     snapshotCompleto() {
-      return { ...estado.snapshot(), alertasAtivos: alertas.ativos() };
+      return { ...estado.snapshot(), canais: ingest.snapshotCanais(), alertasAtivos: alertas.ativos() };
     },
 
     async encerrar() {
