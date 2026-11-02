@@ -64,6 +64,37 @@ export default async function rotasLeituras(app, { ctx }) {
     });
   });
 
+
+  // Ponte local Arduino → Render: entrada física experimental isolada.
+  // Fail closed sem configuração, autenticação própria e nenhuma escrita na
+  // tabela operacional de leituras reais (IngestService trata canal prototipo).
+  app.post('/leituras/prototipo', {
+    schema: {
+      tags: ['Leituras'],
+      summary: 'Ponte experimental do Arduino USB local; requer X-Prototype-Key e NÃO é leitura de campo',
+      headers: { type: 'object', properties: { 'x-prototype-key': { type: 'string' } } },
+      body: {
+        type: 'object',
+        required: ['bueiroId', 'distanciaCm'],
+        additionalProperties: false,
+        properties: {
+          bueiroId: { type: ['string', 'integer'] },
+          distanciaCm: { type: 'number', minimum: 0, maximum: 10000 },
+          raw: { type: 'integer' }
+        }
+      }
+    }
+  }, async (req, reply) => {
+    const esperada = ctx.config.prototypeIngestApiKey;
+    if (!esperada) return reply.code(503).send({ erro: 'Ponte experimental desativada: configure PROTOTYPE_INGEST_API_KEY no servidor.' });
+    if (!chaveConfere(req.headers['x-prototype-key'], esperada)) {
+      return reply.code(401).send({ erro: 'Credencial da ponte experimental inválida.' });
+    }
+    const resultado = await ctx.ingest.registrar({ ...req.body, origem: ORIGENS.ARDUINO_USB });
+    if (!resultado.aceita) return reply.code(422).send({ erro: resultado.motivo });
+    return reply.code(201).send({ aceita: true, canal: 'prototipo', natureza: 'experimental', bueiroId: resultado.leitura.bueiroId });
+  });
+
   app.post('/leituras', {
     schema: {
       tags: ['Leituras'],
