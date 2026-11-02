@@ -109,6 +109,15 @@ export default async function rotasIA(app, { ctx }) {
       return { status: 'indisponivel', modo, mensagem: 'IA generativa desativada no servidor; a análise determinística permanece disponível.' };
     }
     const anterior = cachePorModo.get(modo);
+    // O protótipo pode perder comunicação durante o cache; nunca devolver
+    // relatório antigo como se fosse a condição atual.
+    if (modo === 'prototipo') {
+      const registrosAtuais = Object.values(ctx.snapshotCompleto().canais?.prototipo || {}).filter(b =>
+        b?.valido === true && Number.isFinite(Number(b.timestamp)) && agora >= Number(b.timestamp) &&
+        agora - Number(b.timestamp) <= 15000
+      );
+      if (!registrosAtuais.length) return { status: 'sem_dados', modo, mensagem: 'Aguardando leituras atuais do Arduino.', fontes: [] };
+    }
     if (anterior && agora < anterior.expiraEm) return anterior.resposta;
     if (pendenciasPorModo.has(modo)) return anterior?.resposta || { status: 'processando', modo };
     const tarefa = (async () => {
@@ -118,9 +127,9 @@ export default async function rotasIA(app, { ctx }) {
           // Nunca aceite leituras artificiais enviadas pelo cliente; use o
           // canal de telemetria experimental mantido pelo próprio servidor.
           const snapshot = ctx.snapshotCompleto();
-          const canal = snapshot.canais?.prototipo || snapshot.bueiros || {};
-          // O backend legado fornece bueiros diretamente; versões novas
-          // podem expor canais isolados por origem.
+          const canal = snapshot.canais?.prototipo || {};
+          // Nunca usar bueiros gerais como fallback: podem conter leituras
+          // de campo ou do simulador, misturando as fontes na IA.
           const registros = Object.values(canal).filter((b) =>
             b && b.valido === true && !b.desatualizado && Number.isFinite(Number(b.nivelPct)) &&
             Number.isFinite(Number(b.timestamp)) && agora - Number(b.timestamp) <= 30000 &&
