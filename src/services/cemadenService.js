@@ -53,7 +53,7 @@ export class CemadenService {
   async _consultar() {
     const base = {
       metadados: { cidade: 'Cáceres', uf: 'MT', estacaoCodigo: null, estacaoNome: 'Estações verificadas na consulta' },
-      ultimaConsulta: new Date().toISOString(), dadosEstacaoPortoAlegre: null
+      ultimaConsulta: new Date().toISOString(), dadosEstacaoMunicipio: null
     };
     if (!this.token && !(this.email && this.senha)) {
       return { ...base, autenticado: false, status: 'sem_token',
@@ -82,7 +82,7 @@ export class CemadenService {
       const lista = registros.filter(estaEmCaceres);
       return { ...base, autenticado: true, status: lista.length ? 'sucesso' : 'sem_dados_recentes',
         metadados: { ...base.metadados, estacaoNome: lista.length ? lista.length + ' registro(s) de Cáceres' : 'Nenhuma estação confirmada' },
-        dadosEstacaoPortoAlegre: lista.length ? lista : null,
+        dadosEstacaoMunicipio: lista.length ? lista : null,
         mensagem: lista.length ? 'Registros identificados para Cáceres-MT.' : 'Nenhum registro recente identificado para Cáceres-MT.' };
     } catch (err) {
       this.log?.warn?.({ status: err.status, message: err.message }, 'Consulta CEMADEN falhou');
