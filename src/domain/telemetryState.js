@@ -33,6 +33,7 @@ function bueiroVazio(cfg, origem = 'Nenhum dado recebido') {
     alturaUtilCm: Math.round((cfg.alturaTotalCm - cfg.distanciaCegaCm) * 10) / 10,
     timestamp: null,
     taxaVariacaoMinuto: 0,
+    confiabilidadeTendencia: { confiavel: false, motivo: 'Aguardando amostras suficientes', amostras: 0 },
     tendencia: 'estavel',
     risco: 'normal',
     historicoNiveis: [],
@@ -125,6 +126,7 @@ export class TelemetryState extends EventEmitter {
 
     const variacao = CoreCalculator.calcularTaxaVariacao(b.historicoNiveis, b.historicoTimestamps);
     b.taxaVariacaoMinuto = variacao.taxaMinuto;
+    b.confiabilidadeTendencia = CoreCalculator.avaliarConfiabilidadeSerie(b.historicoNiveis, b.historicoTimestamps);
     b.tendencia = variacao.tendencia;
     b.risco = RiskRules.classificarNivel(b.nivelPct, cfg);
 
@@ -179,6 +181,7 @@ export class TelemetryState extends EventEmitter {
     for (const b of Object.values(this.bueiros)) {
       if (b.conectado && !b.desatualizado && b.timestamp && agora - b.timestamp > timeoutMs) {
         b.desatualizado = true;
+        b.confiabilidadeTendencia = { confiavel: false, motivo: 'Leitura desatualizada', amostras: b.historicoNiveis.length };
         mudou = true;
       }
     }
