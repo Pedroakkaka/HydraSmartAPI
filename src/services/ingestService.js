@@ -26,7 +26,8 @@ export class IngestService {
     this.log = log;
     // Canais de exibição isolados: bancada Arduino e sensores de campo HTTP.
     // Os dados sintéticos do simulador legado nunca entram nesses canais.
-    this.canais = { prototipo: {}, campo: {} };
+    this.canais = { prototipo: {}, campo: {}, demonstracao: {} };
+    this.calibracoesDemonstracao = {};
   }
 
   snapshotCanais() {
@@ -41,7 +42,7 @@ export class IngestService {
   }
 
   registrarCanal(id, grandezas, leitura) {
-    const canal = leitura.origem === ORIGENS.ARDUINO_USB ? 'prototipo' : 'campo';
+    const canal = leitura.origem === ORIGENS.SIMULADOR ? 'demonstracao' : leitura.origem === ORIGENS.ARDUINO_USB ? 'prototipo' : 'campo';
     const anterior = this.canais[canal][id] || {
       historicoNiveis: [], historicoTimestamps: [], historicoDistancias: []
     };
@@ -79,7 +80,7 @@ export class IngestService {
       return { aceita: false, motivo: 'Leituras simuladas só são aceitas no modo demonstração' };
     }
 
-    const cfg = this.estado.calibracoes[id];
+    const cfg = simulado ? (this.calibracoesDemonstracao[id] || this.estado.calibracoes[id]) : this.estado.calibracoes[id];
     const temDistancia = entrada.distanciaCm !== undefined && entrada.distanciaCm !== null;
     const grandezas = temDistancia
       ? converterDistanciaParaNivel(cfg, entrada.distanciaCm)
@@ -101,7 +102,7 @@ export class IngestService {
       timestamp
     };
 
-    if (!simulado) this.registrarCanal(id, grandezas, leitura);
+    this.registrarCanal(id, grandezas, leitura);
     const exibirNoPainel = simulado || this.estado.modo === MODOS.REAL;
     if (exibirNoPainel) {
       this.estado.aplicarLeitura(id, grandezas, { origem: entrada.origem, raw: entrada.raw, timestamp });
@@ -112,7 +113,7 @@ export class IngestService {
     }
 
     await this.alertas.avaliar({ bueiroId: id, nomeBueiro: cfg.nome, nivelPct: grandezas.nivelPct, risco }, { simulado });
-    if (!simulado) this.estado.emit('mudanca');
+    this.estado.emit('mudanca');
 
     return { aceita: true, leitura };
   }
