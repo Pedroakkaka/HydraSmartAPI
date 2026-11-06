@@ -10,12 +10,14 @@ import { criarRepositoriosMemoria } from '../src/repositories/memoria.js';
 import { criarContexto } from '../src/container.js';
 import { construirApp } from '../src/app.js';
 
+const CHAVE_OPERADOR = 'chave-operador-teste';
+const OPERADOR = { 'x-operator-key': CHAVE_OPERADOR };
 const logMudo = { info() {}, warn() {}, error() {}, debug() {} };
 let ctx;
 let app;
 
 async function montar(env = {}) {
-  const config = carregarConfig({ NODE_ENV: 'test', SERIAL_ENABLED: 'false', ...env });
+  const config = carregarConfig({ NODE_ENV: 'test', SERIAL_ENABLED: 'false', OPERATOR_API_KEY: CHAVE_OPERADOR, ...env });
   ctx = await criarContexto({ config, repositorios: criarRepositoriosMemoria(), log: logMudo });
   app = await construirApp(ctx);
   await app.ready();
@@ -80,25 +82,25 @@ test('alerta crítico abre acima do limiar e encerra quando o nível baixa', asy
 });
 
 test('calibração altera a conversão das próximas leituras', async () => {
-  const r = await app.inject({ method: 'PUT', url: '/api/v1/bueiros/bueiro_1/calibracao', payload: { alturaTotalCm: 40, distanciaCegaCm: 4 } });
+  const r = await app.inject({ method: 'PUT', url: '/api/v1/bueiros/bueiro_1/calibracao', payload: { alturaTotalCm: 40, distanciaCegaCm: 4 } , headers: OPERADOR });
   assert.equal(r.statusCode, 200);
   const leitura = (await enviar({ bueiroId: 1, distanciaCm: 22 })).json();
   assert.equal(leitura.nivelPct, 50); // (40-22)/36
-  const invalida = await app.inject({ method: 'PUT', url: '/api/v1/bueiros/1/calibracao', payload: { alturaTotalCm: 'abc' } });
+  const invalida = await app.inject({ method: 'PUT', url: '/api/v1/bueiros/1/calibracao', payload: { alturaTotalCm: 'abc' } , headers: OPERADOR });
   assert.equal(invalida.statusCode, 400);
 });
 
 test('coordenadas são confirmadas e removidas', async () => {
-  const put = await app.inject({ method: 'PUT', url: '/api/v1/bueiros/2/coordenadas', payload: { latitude: -16.0718, longitude: -57.6789 } });
+  const put = await app.inject({ method: 'PUT', url: '/api/v1/bueiros/2/coordenadas', payload: { latitude: -16.0718, longitude: -57.6789 } , headers: OPERADOR });
   assert.equal(put.json().coordenadasConfirmadas, true);
-  const del = await app.inject({ method: 'DELETE', url: '/api/v1/bueiros/2/coordenadas' });
+  const del = await app.inject({ method: 'DELETE', url: '/api/v1/bueiros/2/coordenadas' , headers: OPERADOR });
   assert.equal(del.json().coordenadasConfirmadas, false);
-  const fora = await app.inject({ method: 'PUT', url: '/api/v1/bueiros/2/coordenadas', payload: { latitude: 120, longitude: 0 } });
+  const fora = await app.inject({ method: 'PUT', url: '/api/v1/bueiros/2/coordenadas', payload: { latitude: 120, longitude: 0 } , headers: OPERADOR });
   assert.equal(fora.statusCode, 400);
 });
 
 test('modo demonstração não grava dados simulados no banco', async () => {
-  const r = await app.inject({ method: 'POST', url: '/api/v1/simulacao/iniciar', payload: { cenario: 'tempestade_transbordo' } });
+  const r = await app.inject({ method: 'POST', url: '/api/v1/simulacao/iniciar', payload: { cenario: 'tempestade_transbordo' } , headers: OPERADOR });
   assert.equal(r.statusCode, 200);
   const estado = r.json();
   assert.equal(estado.modo, 'demo');
@@ -109,7 +111,7 @@ test('modo demonstração não grava dados simulados no banco', async () => {
   assert.equal((await app.inject('/api/v1/leituras')).json().length, 0);
   assert.equal((await app.inject('/api/v1/alertas')).json().length, 0, 'alertas simulados ficam fora da lista padrão');
 
-  const fim = (await app.inject({ method: 'POST', url: '/api/v1/simulacao/encerrar' })).json();
+  const fim = (await app.inject({ method: 'POST', url: '/api/v1/simulacao/encerrar' , headers: OPERADOR })).json();
   assert.equal(fim.modo, 'real');
   assert.equal(fim.alertasAtivos.length, 0);
   assert.equal(fim.bueiros.bueiro_1.conectado, false);
@@ -152,6 +154,25 @@ test('série histórica agrega leituras por intervalo', async () => {
 
   const excessivo = await app.inject(`/api/v1/leituras/serie?desde=2020-01-01T00:00:00Z&intervaloSegundos=10`);
   assert.equal(excessivo.statusCode, 400);
+});
+
+test('ações de operador exigem a chave correta', async () => {
+  const semChave = await app.inject({ method: 'POST', url: '/api/v1/simulacao/iniciar', payload: {} });
+  assert.equal(semChave.statusCode, 401);
+  const errada = await app.inject({ method: 'POST', url: '/api/v1/simulacao/iniciar', payload: {}, headers: { 'x-operator-key': 'outra' } });
+  assert.equal(errada.statusCode, 401);
+  const certa = await app.inject({ method: 'POST', url: '/api/v1/simulacao/encerrar', headers: OPERADOR });
+  assert.equal(certa.statusCode, 200);
+  // Leituras de sensores em campo usam a X-API-Key própria, não a chave do operador
+  assert.equal((await enviar({ bueiroId: 1, distanciaCm: 11 })).statusCode, 201);
+});
+
+test('sem OPERATOR_API_KEY configurada as ações de operador ficam bloqueadas (falha segura)', async () => {
+  await app.close();
+  await ctx.encerrar();
+  await montar({ OPERATOR_API_KEY: '' });
+  const r = await app.inject({ method: 'POST', url: '/api/v1/simulacao/iniciar', payload: {}, headers: OPERADOR });
+  assert.equal(r.statusCode, 503);
 });
 
 test('rota inexistente devolve 404 em JSON', async () => {

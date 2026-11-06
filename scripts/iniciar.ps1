@@ -10,6 +10,8 @@ if (-not (Test-Path (Join-Path $PastaApi 'node_modules')) -or -not (Test-Path (J
   Parar-ComErro 'O sistema ainda não foi instalado neste computador. Rode primeiro INSTALAR-HYDRASMART.bat.'
 }
 
+$chaveOperador = Garantir-ChaveOperador
+
 Garantir-Docker
 Subir-Banco
 
@@ -59,6 +61,7 @@ Write-Host "   Neste computador:   $UrlPainel" -ForegroundColor Green
 if ($ipRede) {
   Write-Host "   Em outro aparelho:  http://${ipRede}:4173  (mesma rede Wi-Fi)" -ForegroundColor Green
 }
+if ($chaveOperador) { Write-Host "   Chave do operador:  $chaveOperador  (pedida pelo painel nas ações de operador)" -ForegroundColor Green }
 Write-Host '   Para desligar: PARAR-HYDRASMART.bat' -ForegroundColor Green
 Write-Host '=============================================================' -ForegroundColor Green
 Write-Host ''

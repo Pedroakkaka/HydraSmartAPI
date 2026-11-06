@@ -99,6 +99,14 @@ Em cerca de 30 segundos:
 
 Na primeira vez, o Firewall do Windows pode pedir permissão para o **Node.js**. Marque **Redes privadas** e clique em **Permitir**. Isso é necessário para mostrar o painel em outro aparelho.
 
+### Chave do operador
+
+Ações que alteram o sistema pedem a **chave do operador**: conectar o Arduino, salvar a calibração e ligar ou desligar a simulação. O painel pede a chave uma vez e a reutiliza até a página ser recarregada.
+
+- A chave é criada automaticamente pelo instalador e aparece na janela do `INICIAR` e do `INSTALAR`.
+- Ela também fica no arquivo `HydraSmartAPI\.env`, na linha `OPERATOR_API_KEY`.
+- Para trocar a chave, apague o valor dessa linha e rode o `INICIAR` de novo: uma nova é gerada.
+
 ### Mostrar o painel numa TV, tablet ou celular
 
 A janela do `INICIAR` mostra um endereço como `http://192.168.0.15:4173`. Abra esse endereço em qualquer aparelho **conectado à mesma rede Wi-Fi**. Todos atualizam em tempo real ao mesmo tempo.
@@ -115,6 +123,7 @@ Dê **dois cliques** em `PARAR-HYDRASMART.bat`. As leituras gravadas ficam salva
 - [ ] Abrir o Docker Desktop e esperar "Engine running". Se a opção de iniciar com o Windows estiver marcada, ele abre sozinho.
 - [ ] Plugar o Arduino, com a IDE do Arduino fechada.
 - [ ] `INICIAR-HYDRASMART.bat`.
+- [ ] Anotar a **chave do operador** que aparece na janela. O painel vai pedi-la.
 - [ ] Abrir a página **Diagnóstico** e conferir o autodiagnóstico: API, tempo real, banco e Arduino devem estar em ✔.
 - [ ] Testar o som da sirene (Diagnóstico → **Testar sirene**). O navegador só libera som depois do primeiro clique na página.
 - [ ] **Plano B**: se o Arduino falhar, clique em **Modo Real → Trocar** no menu lateral. O modo demonstração simula os cenários de chuva e alagamento sem gravar nada no histórico.
@@ -166,6 +175,8 @@ Ligação dos sensores HC-SR04: Bueiro 01 com TRIG em D9 e ECHO em D10. Bueiro 0
 | "porta ocupada" ao iniciar o banco | Outro programa usa a porta 5433. No `.env`, troque `DB_PORT=5434` e a porta em `DATABASE_URL` para `5434` |
 | Arduino não é encontrado | Feche a IDE do Arduino. Troque o cabo, pois alguns cabos só carregam e não transmitem dados. Instale o driver CH340. Se houver mais de uma placa, defina `SERIAL_PORT=COM4` (a porta certa) no `.env` |
 | Bueiros "Desatualizado" | O Arduino parou de enviar dados. Confira o cabo. A API reconecta sozinha a cada 5 segundos |
+| "Chave de operador necessária" ou "inválida" | Use a chave que aparece na janela do `INICIAR`, ou a linha `OPERATOR_API_KEY` do arquivo `HydraSmartAPI\.env` |
+| "Operações administrativas desabilitadas" | O `.env` está sem `OPERATOR_API_KEY`. Rode o `INICIAR-HYDRASMART.bat` de novo: ele cria a chave sozinho. Se a API já estiver rodando, rode o `PARAR` antes |
 | Painel mostra "Servidor indisponível" | A janela "HydraSmart API" foi fechada ou mostra um erro. Rode `PARAR` e depois `INICIAR` |
 | Outro aparelho não abre o painel | Os dois precisam estar no mesmo Wi-Fi, e o Firewall precisa permitir o Node.js em "Redes privadas" |
 | Banco aparece como "memória" no Diagnóstico | O Docker não estava ligado quando a API subiu. Os dados não serão salvos. Abra o Docker, rode `PARAR` e depois `INICIAR` |

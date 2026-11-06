@@ -2,6 +2,7 @@
  * Monta a aplicação Fastify (sem abrir porta), para ser usada pelo servidor e pelos testes.
  */
 
+import { timingSafeEqual } from 'node:crypto';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
@@ -66,7 +67,13 @@ export async function construirApp(ctx, { logger = false } = {}) {
 
   // Proteção das rotas de escrita antes de disponibilizar a API via túnel HTTPS.
   // Chave de operador exclusiva do backend; nunca incluí-la no bundle público do React.
-  const operatorKey = process.env.OPERATOR_API_KEY;
+  const operatorKey = ctx.config.operatorApiKey;
+  const chaveConfere = (recebida) => {
+    if (typeof recebida !== 'string') return false;
+    const a = Buffer.from(recebida.trim());
+    const b = Buffer.from(operatorKey);
+    return a.length === b.length && timingSafeEqual(a, b);
+  };
   app.addHook('onRequest', async (req, reply) => {
     const path = req.url.split('?')[0];
     const isMutation = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method);
@@ -74,8 +81,7 @@ export async function construirApp(ctx, { logger = false } = {}) {
     const isAI = req.method === 'POST' && path === '/api/v1/ia/analisar';
     if (!isMutation || isIngest || isAI || !path.startsWith('/api/v1/')) return;
     if (!operatorKey) return reply.code(503).send({ erro: 'Operações administrativas desabilitadas: configure OPERATOR_API_KEY no backend.' });
-    const provided = req.headers['x-operator-key'];
-    if (typeof provided !== 'string' || provided !== operatorKey) {
+    if (!chaveConfere(req.headers['x-operator-key'])) {
       return reply.code(401).send({ erro: 'Chave de operador necessária.' });
     }
   });
