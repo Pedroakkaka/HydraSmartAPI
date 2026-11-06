@@ -44,7 +44,10 @@ async function transmitir(leitura) {
     const resposta = await fetch(destino,{
       method:'POST',
       headers:{'content-type':'application/json','x-prototype-key':chave},
-      body:JSON.stringify({bueiroId:leitura.bueiroId,distanciaCm:leitura.distanciaCm,raw:leitura.raw ?? undefined}),
+      // Régua de eletrodos envia nivelPct; sensor ultrassônico envia distanciaCm (a API exige só um dos dois).
+      body:JSON.stringify(leitura.distanciaCm !== undefined
+        ? {bueiroId:leitura.bueiroId,distanciaCm:leitura.distanciaCm,raw:leitura.raw ?? undefined}
+        : {bueiroId:leitura.bueiroId,nivelPct:leitura.nivelPct,raw:leitura.raw ?? undefined}),
       signal:controlador.signal
     });
     if (!resposta.ok) {
@@ -81,7 +84,7 @@ async function conectar() {
     try {
       const resultado = parseLinhaSerial(String(linha).trim());
       for (const leitura of resultado.leituras || []) {
-        if (!Number.isFinite(Number(leitura.distanciaCm))) continue;
+        if (!Number.isFinite(Number(leitura.distanciaCm)) && !Number.isFinite(Number(leitura.nivelPct))) continue;
         fila.push(leitura);
       }
       // Não acumular horas de leituras caso Render esteja offline.
