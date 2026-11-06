@@ -10,7 +10,6 @@ const SERVIDORES_OSM = [
 const JUIZ_DE_FORA = 'https://sisurb.pjf.mg.gov.br/server/rest/services/sma_drenagem_pluvial_boca_lobo/MapServer/1/query';
 const cache = new Map();
 const emAndamento = new Map();
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const validos = (a) => a.length === 4 && a.every(Number.isFinite);
 export function validarBbox(raw) {
   const c = String(raw || '').split(',').map(Number);
