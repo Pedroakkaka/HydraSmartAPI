@@ -48,7 +48,7 @@ export function sugestoesMunicipios(municipios, termo, limite = 8) {
   }).filter(m => Number.isFinite(m.rank))
     .sort((a, b) => a.rank - b.rank || a.nome.localeCompare(b.nome, 'pt-BR'))
     .slice(0, limite)
-    .map(({ rank, ...municipio }) => municipio);
+    .map(({ rank: _rank, ...municipio }) => municipio);
 }
 
 let catalogo = null;
