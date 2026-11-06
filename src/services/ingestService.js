@@ -50,6 +50,7 @@ export class IngestService {
       ...anterior, id, bueiroId: id, nome: this.estado.calibracoes[id].nome,
       conectado: true, valido: true, desatualizado: false,
       origem: leitura.origem, timestamp: leitura.timestamp,
+      tipoMedicao: leitura.tipoMedicao,
       distanciaCm: leitura.distanciaCm, distanciaMedidaCm: leitura.distanciaCm,
       nivelPct: leitura.nivelPct, alturaAguaCm: leitura.alturaAguaCm,
       volumeMl: leitura.volumeMl, risco: leitura.risco
@@ -99,6 +100,7 @@ export class IngestService {
       volumeMl: grandezas.volumeMl,
       risco,
       raw: entrada.raw ?? null,
+      tipoMedicao: temDistancia ? 'distancia_ultrassonica' : 'nivel_percentual',
       timestamp
     };
 
