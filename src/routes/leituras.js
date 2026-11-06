@@ -75,11 +75,12 @@ export default async function rotasLeituras(app, { ctx }) {
       headers: { type: 'object', properties: { 'x-prototype-key': { type: 'string' } } },
       body: {
         type: 'object',
-        required: ['bueiroId', 'distanciaCm'],
+        required: ['bueiroId'],
         additionalProperties: false,
         properties: {
           bueiroId: { type: ['string', 'integer'] },
           distanciaCm: { type: 'number', minimum: 0, maximum: 10000 },
+          nivelPct: { type: 'number', minimum: 0, maximum: 100, description: 'Percentual calculado para eletrodos de nível, sem sensor ultrassônico' },
           raw: { type: 'integer' }
         }
       }
@@ -89,6 +90,9 @@ export default async function rotasLeituras(app, { ctx }) {
     if (!esperada) return reply.code(503).send({ erro: 'Ponte experimental desativada: configure PROTOTYPE_INGEST_API_KEY no servidor.' });
     if (!chaveConfere(req.headers['x-prototype-key'], esperada)) {
       return reply.code(401).send({ erro: 'Credencial da ponte experimental inválida.' });
+    }
+    if ((req.body.distanciaCm === undefined) === (req.body.nivelPct === undefined)) {
+      return reply.code(400).send({ erro: 'Informe apenas um dos campos: distanciaCm ou nivelPct.' });
     }
     const resultado = await ctx.ingest.registrar({ ...req.body, origem: ORIGENS.ARDUINO_USB });
     if (!resultado.aceita) return reply.code(422).send({ erro: resultado.motivo });
