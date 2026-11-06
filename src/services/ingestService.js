@@ -110,7 +110,9 @@ export class IngestService {
       this.estado.aplicarLeitura(id, grandezas, { origem: entrada.origem, raw: entrada.raw, timestamp });
     }
 
-    if (!simulado) {
+    // Somente os dispositivos operacionais de campo entram no histórico real.
+    // Protótipo USB é experimental e permanece isolado no canal em memória.
+    if (entrada.origem === ORIGENS.HTTP) {
       this.repo.inserir(leitura).catch((err) => this.log.error({ err }, '[leituras] falha ao gravar no banco'));
     }
 
