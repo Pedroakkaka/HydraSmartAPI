@@ -5,7 +5,10 @@
  */
 import { CacheTtl } from './cacheTtl.js';
 
-const URL = 'https://gis-smamus.portoalegre.rs.gov.br/server/rest/services/01_PUBLICACOES/bocas_de_lobo/FeatureServer/0/query';
+const FONTES = [
+  'https://gis-smamus.portoalegre.rs.gov.br/server/rest/services/01_PUBLICACOES/bocas_de_lobo/FeatureServer/0/query',
+  'https://gis-smamus.portoalegre.rs.gov.br/server/rest/services/01_PUBLICACOES/bocas_de_lobo/MapServer/0/query'
+];
 const LIMITE = 2000;
 
 export class BocasLoboService {
@@ -33,22 +36,35 @@ export class BocasLoboService {
     try {
       return await cache.obter(async () => {
         const params = new URLSearchParams({
-          f: 'json', where: '1=1', outFields: '*', returnGeometry: 'true',
+          f: 'json', where: '1=1', outFields: 'objectid,tipo', returnGeometry: 'true',
           outSR: '4326', inSR: '4326', spatialRel: 'esriSpatialRelIntersects',
           geometryType: 'esriGeometryEnvelope',
           geometry: JSON.stringify({ xmin: coords[0], ymin: coords[1], xmax: coords[2], ymax: coords[3], spatialReference: { wkid: 4326 } }),
           resultRecordCount: String(LIMITE)
         });
-        const response = await fetch(URL + '?' + params, { signal: AbortSignal.timeout(15000) });
-        if (!response.ok) throw new Error('HTTP ' + response.status);
-        const data = await response.json();
-        if (data.error) throw new Error(data.error.message || 'Erro no serviço geográfico');
+        let data;
+        let ultimoErro;
+        for (const url of FONTES) {
+          try {
+            const response = await fetch(url + '?' + params, { signal: AbortSignal.timeout(12000) });
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            const candidato = await response.json();
+            if (candidato.error) throw new Error(candidato.error.message || 'Erro no serviço geográfico');
+            if (!Array.isArray(candidato.features)) throw new Error('Resposta sem geometrias válidas');
+            data = candidato;
+            break;
+          } catch (erro) {
+            ultimoErro = erro;
+            this.log.warn({ erro: erro.message }, 'Tentativa de cadastro ArcGIS indisponível');
+          }
+        }
+        if (!data) throw ultimoErro || new Error('Serviços geográficos indisponíveis');
         const elementos = (data.features || []).map((feature) => ({
           id: feature.attributes?.OBJECTID ?? feature.attributes?.objectid ?? null,
           lat: feature.geometry?.y, lon: feature.geometry?.x,
           tipo: feature.attributes?.TIPO ?? 'boca_de_lobo',
           origem: 'Prefeitura de Porto Alegre / SMAMUS',
-        })).filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lon));
+        })).filter((p) => Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lon)));
         return { status: 'sucesso', elementos, parcial: Boolean(data.exceededTransferLimit) || elementos.length >= LIMITE,
           consultadoEm: new Date().toISOString(),
           fonte: 'Prefeitura de Porto Alegre / SMAMUS — cadastro de bocas de lobo',
