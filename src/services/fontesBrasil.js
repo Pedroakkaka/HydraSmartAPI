@@ -45,7 +45,10 @@ export function interpretarTabelaNivel(html, agora = Date.now()) {
     const [,dia,mes,ano,hora,minuto] = data;
     const isoLocal = `${ano}-${mes}-${dia}T${hora}:${minuto}:00-03:00`;
     const timestamp = Date.parse(isoLocal);
-    const nivel = Number(colunas[1].replace(',', '.').replace(/[^\d.-]/g, ''));
+    // Só aceita célula numérica (ex.: "5,67" ou "5,67 m"); texto como "desconhecido" é descartado,
+    // em vez de virar 0 m e fabricar um nível de rio inexistente.
+    const textoNivel = colunas[1].replace(/\s*m$/i, '').trim();
+    const nivel = /^[+-]?\d+(?:[,.]\d+)?$/.test(textoNivel) ? Number(textoNivel.replace(',', '.')) : NaN;
     const variacao = colunas[2] && /^[+-]?\d+(?:[,.]\d+)?$/.test(colunas[2])
       ? Number(colunas[2].replace(',', '.')) : null;
     if (!Number.isFinite(timestamp) || timestamp > agora + 10 * 60_000 ||
@@ -84,7 +87,7 @@ export async function obterNivelBlumenau({ agora = Date.now(), fetcher = fetch }
       };
       expiraEm = Date.now() + TTL;
       return cache;
-    } catch (erro) {
+    } catch {
       expiraEm = Date.now() + 60_000;
       if (cache?.leituras?.length) {
         cache = { ...cache, status: 'desatualizado',
