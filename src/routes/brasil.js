@@ -3,9 +3,9 @@ import { FONTES_NACIONAIS, obterNivelBlumenau } from '../services/fontesBrasil.j
 const cacheMeteorologia = new Map();
 
 async function consultarTempoLocal(lat, lon) {
-  // Reduz precisão para ~1 km, evita registrar posição exata e amplia cache.
-  const latitude = Math.round(lat * 100) / 100;
-  const longitude = Math.round(lon * 100) / 100;
+  // Reduz precisão para ~100 m, evita registrar posição exata e amplia cache.
+  const latitude = Math.round(lat * 1000) / 1000;
+  const longitude = Math.round(lon * 1000) / 1000;
   const chave = latitude + ',' + longitude;
   const anterior = cacheMeteorologia.get(chave);
   if (anterior && Date.now() < anterior.expira) return anterior.dados;
