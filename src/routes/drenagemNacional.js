@@ -7,7 +7,18 @@ const SERVIDORES_OSM = [
   'https://overpass-api.de/api/interpreter',
   'https://overpass.private.coffee/api/interpreter'
 ];
-const JUIZ_DE_FORA = 'https://sisurb.pjf.mg.gov.br/server/rest/services/sma_drenagem_pluvial_boca_lobo/MapServer/1/query';
+const CAMADAS_OFICIAIS = [
+  {
+    nome:'Prefeitura de Juiz de Fora', id:'jf', bounds:[-43.51,-21.86,-43.25,-21.60],
+    url:'https://sisurb.pjf.mg.gov.br/server/rest/services/sma_drenagem_pluvial_boca_lobo/MapServer/1/query',
+    campo:'OBJECTID'
+  },
+  {
+    nome:'SEDUH / Distrito Federal', id:'df', bounds:[-48.25,-16.05,-47.45,-15.55],
+    url:'https://sisdia.df.gov.br/server/rest/services/02_CARACTERIZACAO/Boca_de_Lobo_CACHE/MapServer/0/query',
+    campo:'objectid'
+  }
+];
 const cache = new Map();
 const emAndamento = new Map();
 const validos = (a) => a.length === 4 && a.every(Number.isFinite);
@@ -19,32 +30,42 @@ export function validarBbox(raw) {
   if (sul < -34.2 || norte > 6.5 || oeste < -74.5 || leste > -33.5) return null;
   return c.map(n => Math.round(n * 10000) / 10000);
 }
-const sobrepoeJF = ([w,s,e,n]) => e > -43.5 && w < -43.25 && n > -21.86 && s < -21.61;
-
-async function consultarArcgis(c) {
-  if (!sobrepoeJF(c)) return { elementos: [], ativo: false };
+const sobrepoe = (a,b) => a[2]>b[0] && a[0]<b[2] && a[3]>b[1] && a[1]<b[3];
+async function consultarCamadaOficial(c, camada) {
   const [w,s,e,n] = c;
   const params = new URLSearchParams({
-    f: 'json', where: '1=1', outFields: 'OBJECTID', returnGeometry: 'true',
-    outSR: '4326', inSR: '4326', geometryType: 'esriGeometryEnvelope',
-    spatialRel: 'esriSpatialRelIntersects',
-    geometry: JSON.stringify({ xmin:w, ymin:s, xmax:e, ymax:n, spatialReference:{wkid:4326} }),
-    resultRecordCount: '1500'
+    f:'json', where:'1=1', outFields:camada.campo, returnGeometry:'true',
+    outSR:'4326', inSR:'4326', geometryType:'esriGeometryEnvelope',
+    spatialRel:'esriSpatialRelIntersects',
+    geometry:JSON.stringify({xmin:w,ymin:s,xmax:e,ymax:n,spatialReference:{wkid:4326}}),
+    resultRecordCount:'1500'
   });
-  const response = await fetch(JUIZ_DE_FORA + '?' + params, { signal: AbortSignal.timeout(10000) });
-  if (!response.ok) throw new Error('ArcGIS HTTP ' + response.status);
+  const response = await fetch(camada.url+'?'+params,{signal:AbortSignal.timeout(12000)});
+  if(!response.ok)throw new Error('ArcGIS HTTP '+response.status);
   const json = await response.json();
-  if (json.error || !Array.isArray(json.features)) throw new Error('Formato inválido da camada oficial');
-  return {
-    ativo: true, parcial: Boolean(json.exceededTransferLimit),
-    elementos: json.features.filter(x => Number.isFinite(x.geometry?.x) && Number.isFinite(x.geometry?.y))
-      .map(x => ({
-        id: 'jf-' + (x.attributes?.OBJECTID ?? x.attributes?.objectid ?? x.geometry.x),
-        lat: x.geometry.y, lon: x.geometry.x,
-        origem: 'Prefeitura de Juiz de Fora', fonteTipo: 'oficial',
-        tipo: 'boca_de_lobo', possuiSensor: false
-      }))
-  };
+  if(json.error || !Array.isArray(json.features))throw new Error('Camada sem geometrias válidas');
+  const elementos=[];
+  for(const feature of json.features){
+    const g=feature.geometry || {};
+    // Algumas prefeituras publicam "Multipoint" em vez de "Point".
+    const coords = Array.isArray(g.points) ? g.points : [[g.x,g.y]];
+    coords.forEach(([lon,lat],i)=>{
+      if(!Number.isFinite(lon)||!Number.isFinite(lat))return;
+      elementos.push({
+        id:camada.id+'-'+(feature.attributes?.[camada.campo] ?? feature.attributes?.OBJECTID ?? i)+'-'+i,
+        lat,lon,origem:camada.nome,fonteTipo:'oficial',tipo:'boca_de_lobo',possuiSensor:false
+      });
+    });
+  }
+  return {elementos,parcial:Boolean(json.exceededTransferLimit)};
+}
+async function consultarOficiais(c) {
+  const selecionadas=CAMADAS_OFICIAIS.filter(x=>sobrepoe(c,x.bounds));
+  if(!selecionadas.length)return {elementos:[],parcial:false,erros:0};
+  const result=await Promise.allSettled(selecionadas.map(x=>consultarCamadaOficial(c,x)));
+  const ok=result.filter(x=>x.status==='fulfilled').map(x=>x.value);
+  return {elementos:ok.flatMap(x=>x.elementos),parcial:ok.some(x=>x.parcial),
+    erros:result.length-ok.length};
 }
 
 async function consultarOsm(c) {
@@ -79,7 +100,7 @@ async function consultarOsm(c) {
 }
 
 async function buscar(c) {
-  const [oficial, osm] = await Promise.allSettled([consultarArcgis(c), consultarOsm(c)]);
+  const [oficial, osm] = await Promise.allSettled([consultarOficiais(c), consultarOsm(c)]);
   const fonteOficial = oficial.status === 'fulfilled' ? oficial.value : {elementos:[], ativo:false};
   const fonteOsm = osm.status === 'fulfilled' ? osm.value : {status:'indisponivel',elementos:[]};
   if (oficial.status === 'rejected' && osm.status === 'rejected') {
@@ -88,12 +109,12 @@ async function buscar(c) {
   }
   const todos = [...fonteOficial.elementos, ...fonteOsm.elementos];
   const unicos = [...new Map(todos.map(x => [x.id,x])).values()];
-  return {status:oficial.status === 'rejected' || osm.status === 'rejected' ? 'parcial' : 'sucesso',
+  return {status:oficial.status === 'rejected' || fonteOficial.erros > 0 || osm.status === 'rejected' ? 'parcial' : 'sucesso',
     elementos: unicos,
     contagem:{oficiais:fonteOficial.elementos.length,colaborativos:fonteOsm.elementos.length},
     cobertura:'parcial', parcial:Boolean(fonteOficial.parcial || fonteOsm.parcial),
     consultadoEm:new Date().toISOString(),
-    fontes:['Prefeitura de Juiz de Fora (área de cobertura)', 'OpenStreetMap'],
+    fontes:['Prefeitura de Juiz de Fora (onde há cobertura)', 'SEDUH / Distrito Federal (onde há cobertura)', 'OpenStreetMap'],
     mensagem:'Cobertura parcial. A ausência de registros não comprova inexistência de bocas de lobo. Nenhum ponto implica sensor instalado.'};
 }
 
