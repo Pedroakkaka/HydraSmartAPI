@@ -28,6 +28,10 @@ if (Test-Path $envApi) {
   Escrever-Ok '.env criado a partir do .env.example'
 }
 
+Escrever-Passo 'Configurando a chave do operador'
+$chaveOperador = Garantir-ChaveOperador
+if ($chaveOperador) { Escrever-Ok "Chave do operador: $chaveOperador  (fica salva em HydraSmartAPI\.env, linha OPERATOR_API_KEY)" }
+
 Escrever-Passo 'Instalando dependências da API (pode levar alguns minutos)'
 Executar-Npm $PastaApi @('ci', '--no-audit', '--no-fund')
 Escrever-Ok 'Dependências da API instaladas'
@@ -55,6 +59,7 @@ Write-Host ''
 Write-Host '=============================================================' -ForegroundColor Green
 Write-Host '   Instalação concluída!' -ForegroundColor Green
 Write-Host '   Para ligar o sistema: dois cliques em INICIAR-HYDRASMART.bat' -ForegroundColor Green
+if ($chaveOperador) { Write-Host "   Chave do operador (pedida pelo painel): $chaveOperador" -ForegroundColor Green }
 Write-Host '=============================================================' -ForegroundColor Green
 Write-Host ''
 Read-Host 'Pressione ENTER para fechar'

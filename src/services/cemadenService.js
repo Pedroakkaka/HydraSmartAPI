@@ -1,91 +1,95 @@
 /**
- * Integração com o CEMADEN (estação 510250401A — Jardim das Oliveiras, Cáceres-MT).
- * O token JWT fica só no servidor (CEMADEN_JWT_TOKEN), nunca no navegador.
+ * Integração CEMADEN para Porto Alegre-RS.
+ * Tokens e credenciais permanecem exclusivamente no backend.
+ * O SGAA emite tokens com validade curta; renovação sob demanda e em 401.
  */
-
 import { CacheTtl, buscarJson } from './cacheTtl.js';
 
-const URL_CEMADEN = 'https://sws.cemaden.gov.br/PED/api/pcds/pcds-dados-recentes?uf=MT&rede=11';
-const CODIGO_ESTACAO = '510250401A';
-
-export const METADADOS_CACERES = {
-  ibge: '5102504',
-  cidade: 'Cáceres',
-  uf: 'MT',
-  estacaoCodigo: CODIGO_ESTACAO,
-  estacaoNome: 'Jardim das Oliveiras',
-  tipoEstacao: '1 (Pluviométrica)',
-  sensores: [
-    { id: 10, nome: 'Chuva', unidade: 'mm' },
-    { id: 240, nome: 'Intensidade de Precipitação', unidade: 'mm/h' }
-  ]
+const URL_DADOS = 'https://sws.cemaden.gov.br/PED/api/pcds/pcds-dados-recentes?uf=RS&rede=11';
+const URL_TOKEN = 'https://sgaa.cemaden.gov.br/SGAA/rest/controle-token/tokens';
+const normalizar = (v) => String(v ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toUpperCase();
+const estaEmPortoAlegre = (r) => {
+  const cidade = r.cidade ?? r.municipio ?? r.nomeMunicipio ?? r.nome_municipio ?? r.nomeCidade;
+  const codigo = r.codigoIbge ?? r.codIbge ?? r.codigo_ibge ?? r.codMunicipio;
+  return normalizar(cidade) === 'PORTO ALEGRE' || String(codigo ?? '') === '4314902';
 };
 
 export class CemadenService {
-  constructor({ token, log, ttlMs = 5 * 60 * 1000 }) {
+  constructor({ token = '', email = '', senha = '', log, ttlMs = 5 * 60 * 1000 }) {
     this.token = token;
+    this.email = email;
+    this.senha = senha;
     this.log = log;
     this.cache = new CacheTtl(ttlMs);
+    this.expiraEm = 0;
+    this.renovacao = null;
   }
 
   async obter({ forcar = false } = {}) {
     return this.cache.obter(() => this._consultar(), { forcar });
   }
 
+  async _obterToken({ renovar = false } = {}) {
+    if (!renovar && this.token && (!this.expiraEm || Date.now() < this.expiraEm - 60000)) return this.token;
+    if (!this.email || !this.senha) return renovar ? '' : this.token;
+    if (this.renovacao) return this.renovacao;
+    this.renovacao = (async () => {
+      const resposta = await buscarJson(URL_TOKEN, {
+        method: 'POST', timeoutMs: 12000,
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ email: this.email, password: this.senha })
+      });
+      if (typeof resposta?.token !== 'string' || !resposta.token) throw new Error('SGAA não retornou token');
+      this.token = resposta.token;
+      // timeToExp é informado em segundos no exemplo real do SGAA (14399 ≈ 4h).
+      const segundos = Number(resposta.timeToExp);
+      this.expiraEm = Number.isFinite(segundos) && segundos > 0
+        ? Date.now() + segundos * 1000 : Date.now() + 60 * 60 * 1000;
+      return this.token;
+    })();
+    try { return await this.renovacao; } finally { this.renovacao = null; }
+  }
+
   async _consultar() {
-    const base = { metadados: METADADOS_CACERES, ultimaConsulta: new Date().toISOString(), dadosEstacaoCaceres: null };
-
-    if (!this.token) {
-      return {
-        ...base,
-        autenticado: false,
-        status: 'sem_token',
-        mensagem: 'Token JWT do CEMADEN não configurado no servidor. O acesso exige credencial governamental emitida pelo CEMADEN.',
-        instrucao: 'Defina a variável de ambiente CEMADEN_JWT_TOKEN e reinicie a API.'
-      };
+    const base = {
+      metadados: { cidade: 'Porto Alegre', uf: 'RS', estacaoCodigo: null, estacaoNome: 'Estações verificadas na consulta' },
+      ultimaConsulta: new Date().toISOString(), dadosEstacaoPortoAlegre: null
+    };
+    if (!this.token && !(this.email && this.senha)) {
+      return { ...base, autenticado: false, status: 'sem_token',
+        mensagem: 'Configure CEMADEN_EMAIL e CEMADEN_PASSWORD (renovação automática) ou CEMADEN_JWT_TOKEN no backend.' };
     }
-
     try {
-      const data = await buscarJson(URL_CEMADEN, {
-        timeoutMs: 10_000,
-        headers: { Authorization: `Bearer ${this.token}`, Accept: 'application/json', 'User-Agent': 'HydraSmart-API/3.0' }
-      });
-
-      if (data && !Array.isArray(data) && data.Info) {
-        return { ...base, autenticado: true, status: 'sem_dados_recentes', mensagem: `CEMADEN: ${data.Info}` };
+      let token = await this._obterToken();
+      let data;
+      try {
+        data = await buscarJson(URL_DADOS, { timeoutMs: 12000,
+          headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' } });
+      } catch (err) {
+        if (err.status !== 401 && err.status !== 403) throw err;
+        if (!this.email || !this.senha) return { ...base, autenticado: false, status: 'erro_autenticacao',
+          mensagem: 'Token expirado ou recusado. Configure credenciais SGAA para renovação automática.' };
+        token = await this._obterToken({ renovar: true });
+        data = await buscarJson(URL_DADOS, { timeoutMs: 12000,
+          headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' } });
       }
-
-      const lista = Array.isArray(data) ? data : [];
-      const deCaceres = lista.filter((item) => {
-        const cod = String(item.cod_estacao ?? '').trim();
-        const cidade = String(item.cidade ?? '').toUpperCase();
-        return cod === CODIGO_ESTACAO || cidade.includes('CÁCERES') || cidade.includes('CACERES');
-      });
-      const outras = lista
-        .filter((item) => !deCaceres.includes(item))
-        .slice(0, 5)
-        .map((item) => ({ estacao: item.cod_estacao, cidade: item.cidade, sensor: item.sensor, valor: item.valor, datahora: item.datahora }));
-
-      return {
-        ...base,
-        autenticado: true,
-        status: deCaceres.length ? 'sucesso' : 'sem_dados_recentes',
-        mensagem: deCaceres.length
-          ? 'Dados consultados com sucesso via API do CEMADEN'
-          : `Sem dados recentes da estação de Cáceres (${CODIGO_ESTACAO})`,
-        dadosEstacaoCaceres: deCaceres.length ? deCaceres : null,
-        totalOutrasEstacoesMt: lista.length - deCaceres.length,
-        amostrasOutrasEstacoesMt: outras
-      };
+      // Nunca rotular estações de outras cidades como dados de Porto Alegre.
+      const registros = Array.isArray(data) ? data
+        : Array.isArray(data?.dados) ? data.dados
+        : Array.isArray(data?.data) ? data.data : null;
+      if (!registros) return { ...base, autenticado: true, status: 'sem_dados_recentes',
+        mensagem: 'Resposta do CEMADEN sem lista reconhecida de estações; verificar formato do endpoint.' };
+      const lista = registros.filter(estaEmPortoAlegre);
+      return { ...base, autenticado: true, status: lista.length ? 'sucesso' : 'sem_dados_recentes',
+        metadados: { ...base.metadados, estacaoNome: lista.length ? lista.length + ' registro(s) de Porto Alegre' : 'Nenhuma estação confirmada' },
+        dadosEstacaoPortoAlegre: lista.length ? lista : null,
+        mensagem: lista.length ? 'Registros identificados para Porto Alegre-RS.' : 'Nenhum registro recente identificado para Porto Alegre-RS.' };
     } catch (err) {
-      this.log.warn(`[cemaden] ${err.message}`);
-      const auth = err.status === 401 || err.status === 403;
-      return {
-        ...base,
-        autenticado: false,
-        status: auth ? 'erro_autenticacao' : 'erro_conexao',
-        mensagem: `Falha na comunicação com o CEMADEN: ${err.message}`
-      };
+      this.log?.warn?.({ status: err.status, message: err.message }, 'Consulta CEMADEN falhou');
+      return { ...base, autenticado: false,
+        status: err.status === 401 || err.status === 403 ? 'erro_autenticacao' : 'erro_conexao',
+        mensagem: err.status === 401 || err.status === 403
+          ? 'Credencial recusada pelo CEMADEN.' : 'Não foi possível consultar o CEMADEN. Confira a integração no servidor.' };
     }
   }
 }

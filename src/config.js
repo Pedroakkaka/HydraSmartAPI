@@ -37,13 +37,18 @@ export function carregarConfig(env = process.env) {
 
     // Chave exigida no POST /api/v1/leituras (sensores em campo enviando via HTTP).
     ingestApiKey: env.INGEST_API_KEY || '',
+    // Chave do operador do painel: libera calibração, simulação, conexão USB e demais ações de escrita.
+    // Sem ela, essas ações respondem 503 (falha segura). Gerada automaticamente pelo instalador.
+    operatorApiKey: (env.OPERATOR_API_KEY || '').trim(),
     cemadenToken: env.CEMADEN_JWT_TOKEN || env.CEMADEN_TOKEN || '',
+    cemadenEmail: env.CEMADEN_EMAIL || '',
+    cemadenSenha: env.CEMADEN_PASSWORD || '',
 
     municipio: {
-      nome: 'Cáceres - MT',
-      latitude: -16.0706,
-      longitude: -57.6789,
-      timezone: 'America/Cuiaba'
+      nome: env.MUNICIPIO_NOME || 'Porto Alegre - RS',
+      latitude: Number(env.MUNICIPIO_LATITUDE ?? -30.0346),
+      longitude: Number(env.MUNICIPIO_LONGITUDE ?? -51.2177),
+      timezone: env.MUNICIPIO_TIMEZONE || 'America/Sao_Paulo'
     },
 
     historicoMemoriaAmostras: 50

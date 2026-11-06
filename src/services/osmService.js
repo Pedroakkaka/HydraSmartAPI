@@ -1,12 +1,13 @@
 /**
- * Elementos de drenagem reais do OpenStreetMap em Cáceres (via Overpass API),
+ * Elementos de drenagem reais do OpenStreetMap em Porto Alegre (via Overpass API),
  * consultados pelo servidor com cache de 6 horas e servidores alternativos.
  */
 
 import { CacheTtl } from './cacheTtl.js';
 
-const BBOX = '-16.12,-57.75,-16.02,-57.62';
-const CONSULTA = `[out:json][timeout:15];(node["manhole"](${BBOX});node["waterway"="drain"](${BBOX});way["waterway"="drain"](${BBOX}););out center 200;`;
+// Área aproximada de Porto Alegre. Não representa cadastro municipal completo.
+const BBOX = '-30.27,-51.31,-29.93,-51.03';
+const CONSULTA = `[out:json][timeout:15];(node["manhole"="drain"](${BBOX});node["manhole"="storm_drain"](${BBOX});node["waterway"="drain"](${BBOX});way["waterway"="drain"](${BBOX}););out center 2000;`;
 const SERVIDORES = [
   'https://overpass-api.de/api/interpreter',
   'https://overpass.private.coffee/api/interpreter',
@@ -42,7 +43,7 @@ export class OsmService {
         ? { ...this.cache.valor, status: 'desatualizado' }
         : {
           status: 'indisponivel',
-          mensagem: 'Overpass API/OSM temporariamente indisponível. A drenagem exibida baseia-se nos sensores do protótipo.',
+          mensagem: 'Overpass API/OSM temporariamente indisponível. Os elementos OSM não estão disponíveis no momento; sensores físicos são exibidos separadamente.',
           elementos: [],
           consultadoEm: new Date().toISOString()
         };
@@ -75,7 +76,7 @@ export class OsmService {
 
         return {
           status: 'sucesso',
-          mensagem: `${elementos.length} elementos de drenagem obtidos do OpenStreetMap.`,
+          mensagem: `${elementos.length} elementos de drenagem cadastrados no OpenStreetMap para Porto Alegre (cobertura não exaustiva).`,
           fonte: servidor,
           elementos,
           consultadoEm: new Date().toISOString()

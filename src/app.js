@@ -2,6 +2,7 @@
  * Monta a aplicação Fastify (sem abrir porta), para ser usada pelo servidor e pelos testes.
  */
 
+import { timingSafeEqual } from 'node:crypto';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
@@ -15,6 +16,7 @@ import rotasLeituras from './routes/leituras.js';
 import rotasOperacao from './routes/operacao.js';
 import rotasExternas from './routes/externos.js';
 import rotasRelatorios from './routes/relatorios.js';
+import rotasIA from './routes/ia.js';
 
 /**
  * @param {object} ctx Contexto criado por criarContexto()
@@ -41,7 +43,7 @@ export async function construirApp(ctx, { logger = false } = {}) {
     openapi: {
       info: {
         title: 'HydraSmart API',
-        description: 'Monitoramento de drenagem urbana e prevenção de alagamentos — Cáceres-MT. ' +
+        description: 'Monitoramento de drenagem urbana e prevenção de alagamentos — Porto Alegre-RS. ' +
           'Atualizações em tempo real pelo WebSocket em /ws.',
         version: '3.0.0'
       },
@@ -63,10 +65,53 @@ export async function construirApp(ctx, { logger = false } = {}) {
 
   app.setNotFoundHandler((req, reply) => reply.code(404).send({ erro: `Rota não encontrada: ${req.method} ${req.url}` }));
 
+  // Proteção das rotas de escrita antes de disponibilizar a API via túnel HTTPS.
+  // Chave de operador exclusiva do backend; nunca incluí-la no bundle público do React.
+  const operatorKey = ctx.config.operatorApiKey;
+  const chaveConfere = (recebida) => {
+    if (typeof recebida !== 'string') return false;
+    const a = Buffer.from(recebida.trim());
+    const b = Buffer.from(operatorKey);
+    return a.length === b.length && timingSafeEqual(a, b);
+  };
+  app.addHook('onRequest', async (req, reply) => {
+    const path = req.url.split('?')[0];
+    const isMutation = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method);
+    const isIngest = req.method === 'POST' && path === '/api/v1/leituras';
+    const isAI = req.method === 'POST' && path === '/api/v1/ia/analisar';
+    if (!isMutation || isIngest || isAI || !path.startsWith('/api/v1/')) return;
+    if (!operatorKey) return reply.code(503).send({ erro: 'Operações administrativas desabilitadas: configure OPERATOR_API_KEY no backend.' });
+    if (!chaveConfere(req.headers['x-operator-key'])) {
+      return reply.code(401).send({ erro: 'Chave de operador necessária.' });
+    }
+  });
+
+  // Limite básico de consumo da IA por endereço de origem; não substitui
+  // autenticação e cotas no provedor Gemini.
+  const aiHits = new Map();
+  app.addHook('onRequest', async (req, reply) => {
+    if (req.method !== 'POST' || req.url.split('?')[0] !== '/api/v1/ia/analisar') return;
+    // Fail closed: uma API pública não pode oferecer consumo livre da chave Gemini.
+    // A IA só é reativada após implementar autenticação segura do lado do servidor.
+    if (process.env.ENABLE_PUBLIC_AI !== 'true') {
+      return reply.code(503).send({ erro: 'Análise por IA temporariamente desabilitada para proteger a chave Gemini.' });
+    }
+    const now = Date.now();
+    const key = req.ip;
+    const prev = aiHits.get(key);
+    const entry = prev && now - prev.start < 60000 ? prev : { start: now, count: 0 };
+    entry.count++;
+    aiHits.set(key, entry);
+    if (aiHits.size > 2000) {
+      for (const [ip, item] of aiHits) if (now - item.start >= 60000) aiHits.delete(ip);
+    }
+    if (entry.count > 5) return reply.code(429).send({ erro: 'Limite de análises atingido. Tente novamente em um minuto.' });
+  });
+
   await registrarWebSocket(app, ctx);
 
   await app.register(async (api) => {
-    for (const rotas of [rotasSistema, rotasBueiros, rotasLeituras, rotasOperacao, rotasExternas, rotasRelatorios]) {
+    for (const rotas of [rotasSistema, rotasBueiros, rotasLeituras, rotasOperacao, rotasExternas, rotasRelatorios, rotasIA]) {
       await api.register(rotas, { ctx });
     }
   }, { prefix: '/api/v1' });

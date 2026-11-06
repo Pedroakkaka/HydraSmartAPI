@@ -49,7 +49,7 @@ test('CoreCalculator calcula taxa, tendência e tempo até o limiar', () => {
   const taxa = CoreCalculator.calcularTaxaVariacao([30, 42], [1_000_000, 1_060_000]);
   assert.equal(taxa.taxaMinuto, 12);
   assert.equal(taxa.tendencia, 'elevacao');
-  assert.equal(CoreCalculator.estimarTempoAteLimiar(60, 2, 80).minutosEstimados, 10);
+  assert.equal(CoreCalculator.estimarTempoAteLimiar(60, 2, 80).minutosEstimados, null, 'sem histórico não há ETA confiável');
   assert.equal(CoreCalculator.estimarTempoAteLimiar(60, -1, 80).minutosEstimados, null);
   assert.equal(CoreCalculator.formatarDuracao(4), '4 min');
 });
@@ -86,4 +86,59 @@ test('sanitizarParametros aplica travas físicas', () => {
   assert.equal(r.distanciaCegaCm, 3);
   assert.equal(r.limiteCriticoPct, 75, 'crítico sempre pelo menos 5 pontos acima da atenção');
   assert.equal(sanitizarParametros(cfg, {}).alturaTotalCm, 20, 'campos ausentes mantêm o valor atual');
+});
+
+test('Previsão rejeita séries com poucas amostras', () => {
+  const agora = 1_800_000_000_000;
+  const serie = { niveis: [50, 51], timestamps: [agora - 5000, agora], agoraMs: agora };
+  assert.equal(CoreCalculator.avaliarConfiabilidadeSerie(serie.niveis, serie.timestamps, agora).confiavel, false);
+  const p = CoreCalculator.estimarTempoAteLimiar(51, 2, 80, serie);
+  assert.equal(p.confiavel, false);
+  assert.equal(p.alcancavel, false);
+  assert.equal(p.minutosEstimados, null);
+});
+
+test('Previsão valida elevação estável e rejeita oscilações', () => {
+  const agora = 1_800_000_000_000;
+  const timestamps = Array.from({ length: 5 }, (_, i) => agora - 20000 + i * 5000);
+  const estavel = { niveis: [50, 51, 52, 53, 54], timestamps, agoraMs: agora };
+  const oscilante = { ...estavel, niveis: [50, 54, 51, 56, 54] };
+  assert.equal(CoreCalculator.avaliarConfiabilidadeSerie(estavel.niveis, timestamps, agora).confiavel, true);
+  assert.equal(CoreCalculator.estimarTempoAteLimiar(54, 12, 80, estavel).confiavel, true);
+  assert.equal(CoreCalculator.avaliarConfiabilidadeSerie(oscilante.niveis, timestamps, agora).confiavel, false);
+  assert.equal(CoreCalculator.estimarTempoAteLimiar(54, 12, 80, oscilante).confiavel, false);
+});
+
+test('Previsão rejeita leituras antigas e timestamps repetidos', () => {
+  const agora = 1_800_000_000_000;
+  const tempos = Array.from({ length: 5 }, (_, i) => agora - 50000 + i * 5000);
+  assert.equal(CoreCalculator.avaliarConfiabilidadeSerie([50,51,52,53,54], tempos, agora).confiavel, false);
+  assert.equal(CoreCalculator.avaliarConfiabilidadeSerie([50,51,52,53,54], [agora - 20000, agora - 15000, agora - 10000, agora, agora], agora).confiavel, false);
+  assert.equal(CoreCalculator.estimarTempoAteLimiar(60, 2, 80).confiavel, false);
+});
+
+test('Recupera automaticamente após oscilações antigas saírem da janela recente', () => {
+  const agora = 1_800_000_000_000;
+  const niveis = [45, 65, 46, 70, 40, 50, 51, 52, 53, 54];
+  const timestamps = [
+    agora - 120000, agora - 115000, agora - 110000, agora - 105000, agora - 100000,
+    agora - 20000, agora - 15000, agora - 10000, agora - 5000, agora
+  ];
+  const qualidade = CoreCalculator.avaliarConfiabilidadeSerie(niveis, timestamps, agora);
+  assert.equal(qualidade.confiavel, true);
+  assert.equal(qualidade.amostras, 5);
+});
+
+test('Dados recuperam confiança após novas amostras e não mostram ETA inválido', () => {
+  const agora = 1_800_000_000_000;
+  const poucos = { niveis: [50, 51], timestamps: [agora - 5000, agora], agoraMs: agora };
+  assert.equal(CoreCalculator.estimarTempoAteLimiar(51, 12, 80, poucos).minutosEstimados, null);
+  const recuperado = {
+    niveis: [50, 51, 52, 53, 54],
+    timestamps: [agora - 20000, agora - 15000, agora - 10000, agora - 5000, agora],
+    agoraMs: agora
+  };
+  const resultado = CoreCalculator.estimarTempoAteLimiar(54, 12, 80, recuperado);
+  assert.equal(resultado.confiavel, true);
+  assert.equal(resultado.minutosEstimados, 2.2);
 });
