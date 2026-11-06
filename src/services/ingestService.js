@@ -11,6 +11,7 @@ import { normalizarBueiroId, converterDistanciaParaNivel, converterNivelParaGran
 import { RiskRules } from '../core/riskRules.js';
 import { CoreCalculator } from '../core/calculator.js';
 import { MODOS } from '../domain/telemetryState.js';
+import { diagnosticarPrototipo } from './diagnosticoPrototipo.js';
 
 export const ORIGENS = {
   ARDUINO_USB: 'Arduino USB',
@@ -33,6 +34,7 @@ export class IngestService {
   snapshotCanais() {
     return Object.fromEntries(Object.entries(this.canais).map(([canal, bueiros]) => [canal,
       Object.fromEntries(Object.entries(bueiros).map(([id, b]) => [id, {
+        ...(canal === 'prototipo' ? { diagnostico: diagnosticarPrototipo(b) } : {}),
         ...b,
         historicoNiveis: [...b.historicoNiveis],
         historicoTimestamps: [...b.historicoTimestamps],
@@ -65,6 +67,7 @@ export class IngestService {
     b.tendencia = variacao.tendencia;
     b.taxaVariacaoMinuto = variacao.taxaMinuto;
     b.confiabilidadeTendencia = CoreCalculator.avaliarConfiabilidadeSerie(b.historicoNiveis, b.historicoTimestamps);
+    if (canal === 'prototipo') b.diagnostico = diagnosticarPrototipo(b);
     this.canais[canal][id] = b;
   }
 
