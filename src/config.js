@@ -37,6 +37,9 @@ export function carregarConfig(env = process.env) {
 
     // Chave exigida no POST /api/v1/leituras (sensores em campo enviando via HTTP).
     ingestApiKey: env.INGEST_API_KEY || '',
+    // Chave do operador do painel: libera calibração, simulação, conexão USB e demais ações de escrita.
+    // Sem ela, essas ações respondem 503 (falha segura). Gerada automaticamente pelo instalador.
+    operatorApiKey: (env.OPERATOR_API_KEY || '').trim(),
     cemadenToken: env.CEMADEN_JWT_TOKEN || env.CEMADEN_TOKEN || '',
     cemadenEmail: env.CEMADEN_EMAIL || '',
     cemadenSenha: env.CEMADEN_PASSWORD || '',
