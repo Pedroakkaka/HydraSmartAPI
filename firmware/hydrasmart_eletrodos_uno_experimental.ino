@@ -1,62 +1,88 @@
 /*
- HYDRASMART — Firmware EXPERIMENTAL para régua de eletrodos (Arduino Uno)
- - 6 entradas de nível: A0, A1, A2, A3, A4, A5
- - 1 referência comum na água: GND
- - 1 bomba existente: NÃO é controlada neste firmware.
- ATENÇÃO: presume A0 = contato mais baixo e A5 = mais alto.
- Verifique a ordem real, isolamento elétrico e use APENAS baixa tensão da placa.
- Não conecte bomba diretamente aos pinos do Arduino.
- Entrada INPUT_PULLUP usa corrente pequena, mas contato contínuo com água
- pode provocar corrosão; para implantação duradoura utilize condicionamento
- e eletrodos próprios. Faça testes sem bomba energizada.
+ HYDRASMART — duas réguas de contatos de água, Arduino Uno R3.
+ B01: A0 A1 A2 A3 A4 A5 (do contato inferior ao superior).
+ B02: D2 D3 D4 D5 D6 D7 (do contato inferior ao superior).
+ Cada reservatório possui seu próprio eletrodo de referência GND;
+ os dois eletrodos de referência compartilham o GND do Arduino.
+ Uma amostra por segundo para cada régua, 115200 baud.
+ Não aciona bomba. Não usar D2–D7 se já estiverem ocupados.
+ ATENÇÃO: circuito experimental com INPUT_PULLUP e leitura LOW quando molhado.
+ Testar inicialmente com bomba desligada. A condutividade da água varia;
+ para uso prolongado aplicar proteção/condicionamento e eletrodos adequados.
+ Nunca ligar bomba ou tensão da rede diretamente aos pinos do Arduino.
+ Percentuais só representam frações iguais da altura se contatos equidistantes.
 */
-const byte contatos[6] = { A0, A1, A2, A3, A4, A5 };
-const unsigned long intervaloMs = 1000;
+const byte TOTAL_BUEIROS = 2;
+const byte TOTAL_NIVEIS = 6;
+const byte PINOS[TOTAL_BUEIROS][TOTAL_NIVEIS] = {
+  {A0, A1, A2, A3, A4, A5},
+  {2, 3, 4, 5, 6, 7}
+};
+const unsigned long BAUD = 115200;
+const unsigned long INTERVALO_MS = 1000;
 unsigned long ultimaMedicao = 0;
 
 void setup() {
-  Serial.begin(115200);
-  for (byte i = 0; i < 6; i++) pinMode(contatos[i], INPUT);
-  Serial.println("{\"status\":\"HYDRASMART_ELETRODOS_6_NIVEIS_READY\"}");
+  Serial.begin(BAUD);
+  for (byte b = 0; b < TOTAL_BUEIROS; b++) {
+    for (byte i = 0; i < TOTAL_NIVEIS; i++) {
+      pinMode(PINOS[b][i], INPUT);
+      digitalWrite(PINOS[b][i], LOW); // pull-up desativado
+    }
+  }
+  Serial.println(F("{\"status\":\"HYDRASMART_DUAS_REGUAS_READY\",\"bueiros\":2}"));
 }
 
-void loop() {
-  if (millis() - ultimaMedicao < intervaloMs) return;
-  ultimaMedicao = millis();
-
-  // Habilitar pull-up somente durante janela curta de amostragem.
-  // A referência GND deve estar em contato com a mesma água.
-  byte amostras[6] = {0,0,0,0,0,0};
-  for (byte n = 0; n < 5; n++) {
-    for (byte i = 0; i < 6; i++) pinMode(contatos[i], INPUT_PULLUP);
+void lerBueiro(byte indice) {
+  byte contagens[TOTAL_NIVEIS] = {0, 0, 0, 0, 0, 0};
+  // Energiza os eletrodos somente durante a pequena janela de leitura.
+  for (byte amostra = 0; amostra < 5; amostra++) {
+    for (byte i = 0; i < TOTAL_NIVEIS; i++)
+      pinMode(PINOS[indice][i], INPUT_PULLUP);
     delay(4);
-    for (byte i = 0; i < 6; i++) {
-      if (digitalRead(contatos[i]) == LOW) amostras[i]++;
-      pinMode(contatos[i], INPUT);
+    for (byte i = 0; i < TOTAL_NIVEIS; i++) {
+      if (digitalRead(PINOS[indice][i]) == LOW) contagens[i]++;
+      pinMode(PINOS[indice][i], INPUT);
+      digitalWrite(PINOS[indice][i], LOW);
     }
     delay(4);
   }
+
   byte mascara = 0;
-  for (byte i = 0; i < 6; i++) {
-    if (amostras[i] >= 4) mascara |= (1 << i);
+  for (byte i = 0; i < TOTAL_NIVEIS; i++) {
+    if (contagens[i] >= 4) mascara |= (byte)(1U << i);
   }
-  // Falhas de continuidade geram estado inválido, não percentual inventado.
   byte niveis = 0;
   bool lacuna = false;
-  for (byte i = 0; i < 6; i++) {
-    if (mascara & (1 << i)) {
+  for (byte i = 0; i < TOTAL_NIVEIS; i++) {
+    if (mascara & (1U << i)) {
       if (lacuna) {
-        Serial.println("{\"bueiro\":1,\"erro\":\"CONTATOS_INCONSISTENTES\"}");
+        Serial.print(F("{\"bueiro\":"));
+        Serial.print(indice + 1);
+        Serial.println(F(",\"erro\":\"CONTATOS_INCONSISTENTES\"}"));
         return;
       }
       niveis++;
-    } else lacuna = true;
+    } else {
+      lacuna = true;
+    }
   }
-  // Se espaçamentos não forem iguais, percentual requer calibração por altura.
-  float percentual = (niveis * 100.0f) / 6.0f;
-  Serial.print("{\"bueiro\":1,\"nivel_pct\":");
-  Serial.print(percentual, 1);
-  Serial.print(",\"raw\":");
+  const float nivelPct = 100.0f * niveis / TOTAL_NIVEIS;
+  Serial.print(F("{\"bueiro\":"));
+  Serial.print(indice + 1);
+  Serial.print(F(",\"nivel_pct\":"));
+  Serial.print(nivelPct, 1);
+  Serial.print(F(",\"contatos_ativos\":"));
+  Serial.print(niveis);
+  Serial.print(F(",\"raw\":"));
   Serial.print(mascara);
-  Serial.println("}");
+  Serial.println('}');
+}
+
+void loop() {
+  const unsigned long agora = millis();
+  if (agora - ultimaMedicao < INTERVALO_MS) return;
+  ultimaMedicao = agora;
+  lerBueiro(0);
+  lerBueiro(1);
 }
