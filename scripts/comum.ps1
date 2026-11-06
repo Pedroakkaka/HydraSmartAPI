@@ -140,6 +140,34 @@ function Processos-NodeNaPorta([int]$porta) {
   }
 }
 
+# Garante uma OPERATOR_API_KEY no .env da API (gera uma aleatória se estiver vazia ou ausente)
+# e devolve o valor. O painel pede essa chave para ações de operador.
+function Garantir-ChaveOperador {
+  $arquivo = Join-Path $PastaApi '.env'
+  if (-not (Test-Path $arquivo)) { return $null }
+  $linhas = @(Get-Content -Path $arquivo -Encoding UTF8)
+  $atual = $linhas | Where-Object { $_ -match '^\s*OPERATOR_API_KEY\s*=' } | Select-Object -First 1
+  if ($atual) {
+    $valor = ($atual -split '=', 2)[1].Trim()
+    if ($valor) { return $valor }
+  }
+
+  $bytes = New-Object byte[] 9
+  [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+  $nova = [Convert]::ToBase64String($bytes).Replace('+', 'A').Replace('/', 'B').Replace('=', '')
+
+  if ($atual) {
+    $linhas = $linhas | ForEach-Object { if ($_ -match '^\s*OPERATOR_API_KEY\s*=') { "OPERATOR_API_KEY=$nova" } else { $_ } }
+  } else {
+    $linhas += ''
+    $linhas += '# Chave do operador do painel (gerada automaticamente pelo instalador)'
+    $linhas += "OPERATOR_API_KEY=$nova"
+  }
+  # .env em UTF-8 sem BOM (o Node lê sem problemas)
+  [System.IO.File]::WriteAllLines($arquivo, [string[]]$linhas, (New-Object System.Text.UTF8Encoding($false)))
+  return $nova
+}
+
 function Executar-Npm([string]$pasta, [string[]]$argumentos) {
   Push-Location $pasta
   try {
