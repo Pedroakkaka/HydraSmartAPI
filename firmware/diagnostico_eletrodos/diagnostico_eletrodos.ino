@@ -27,15 +27,15 @@
  *    Se mesmo assim não marcar MOLHADO, o problema é fio/ligação, não a água.
  */
 
-const byte B01[6] = {A0, A1, A2, A3, A4, A5};
-const byte B02[6] = {2, 3, 4, 5, 6, 7};
+const byte PINOS_B1[6] = {A0, A1, A2, A3, A4, A5};
+const byte PINOS_B2[6] = {2, 3, 4, 5, 6, 7};
 const int LIMIAR_DIGITAL_APROX = 300; // abaixo disso o pino digital lê LOW (molhado)
 
 void setup() {
   Serial.begin(115200);
   for (byte i = 0; i < 6; i++) {
-    pinMode(B01[i], INPUT);
-    pinMode(B02[i], INPUT);
+    pinMode(PINOS_B1[i], INPUT);
+    pinMode(PINOS_B2[i], INPUT);
   }
   Serial.println(F("=== HYDRASMART: diagnostico das reguas de eletrodos ==="));
   Serial.println(F("Seco ~1023. Se o valor cai ao molhar mas nao passa de ~300, o firmware atual nao detecta."));
@@ -67,7 +67,7 @@ void loop() {
   Serial.print(F("Bueiro 01:    "));
   int menor = 1023;
   for (byte i = 0; i < 6; i++) {
-    int v = lerAnalogico(B01[i]);
+    int v = lerAnalogico(PINOS_B1[i]);
     if (v < menor) menor = v;
     Serial.print(v);
     Serial.print(v < LIMIAR_DIGITAL_APROX ? F("*") : F(" "));
@@ -77,7 +77,7 @@ void loop() {
 
   Serial.print(F("Bueiro 02:    "));
   for (byte i = 0; i < 6; i++) {
-    Serial.print(lerDigitalMolhado(B02[i]) ? F("MOLHADO ") : F("seco    "));
+    Serial.print(lerDigitalMolhado(PINOS_B2[i]) ? F("MOLHADO ") : F("seco    "));
   }
   Serial.println();
 
