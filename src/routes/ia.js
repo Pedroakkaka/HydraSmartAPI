@@ -171,7 +171,9 @@ export default async function rotasIA(app, { ctx }) {
     const modo = req.query.modo === 'prototipo' ? 'prototipo' : 'real';
     const agora = Date.now();
     if (modo === 'prototipo') {
-      const ativos = Object.values(ctx.snapshotCompleto().canais?.prototipo || {}).filter(b =>
+      const snap = ctx.snapshotCompleto();
+      const canal = snap.modo === 'demo' && snap.simulacao?.ativo ? snap.canais?.demonstracao : snap.canais?.prototipo;
+      const ativos = Object.values(canal || {}).filter(b =>
         b?.valido === true && !b.desatualizado &&
         Number.isFinite(Number(b.timestamp)) &&
         Number(b.timestamp) <= agora + 5000 && agora - Number(b.timestamp) <= 15000
@@ -188,15 +190,19 @@ export default async function rotasIA(app, { ctx }) {
       try {
         let fontes;
         if (modo === 'prototipo') {
-          const canal = ctx.snapshotCompleto().canais?.prototipo || {};
+          const snap = ctx.snapshotCompleto();
+          const simulando = snap.modo === 'demo' && snap.simulacao?.ativo;
+          const canal = simulando ? snap.canais?.demonstracao || {} : snap.canais?.prototipo || {};
           const registros = Object.values(canal).filter(b => b?.valido === true &&
             Number.isFinite(Number(b.timestamp)) && Date.now() - Number(b.timestamp) <= 15000 &&
             Number(b.timestamp) <= Date.now() + 5000).map(b => ({
-            bueiroId: b.bueiroId, origem: 'Arduino USB / protótipo experimental',
+            bueiroId: b.bueiroId, origem: simulando ? 'Simulador digital (sintético)' : 'Arduino USB / protótipo experimental',
             nivelPct: b.nivelPct, risco: b.risco, tendencia: b.tendencia,
-            timestamp: b.timestamp, confiabilidadeTendencia: b.confiabilidadeTendencia
+            timestamp: b.timestamp, confiabilidadeTendencia: b.confiabilidadeTendencia,
+            diagnostico: simulando ? null : b.diagnostico,
+            ultimasAmostras: simulando ? [] : (b.historicoNiveis || []).slice(-20)
           }));
-          fontes = [{ fonte: 'Arduino HydraSmart', tipo: 'leitura física experimental', registros }];
+          fontes = [{ fonte: simulando ? 'Simulador HydraSmart' : 'Arduino HydraSmart', tipo: simulando ? 'cenário sintético' : 'leitura física experimental', registros }];
         } else {
           const contexto = await coletarContextoIA(app, ctx);
           fontes = contexto.fontes;
@@ -206,7 +212,7 @@ export default async function rotasIA(app, { ctx }) {
           'Atue como analista consultivo HydraSmart de Porto Alegre-RS.',
           'Interprete apenas os registros; o Core define riscos e alertas. Não invente previsões nem medições.',
           modo === 'prototipo'
-            ? 'Estas medições são do protótipo físico, não de bueiros urbanos reais. Não atribua condições de Porto Alegre à bancada.'
+            ? 'Estas medições são da bancada física ou simulação sintética (conforme fonte), NÃO de bueiros urbanos. Interprete diagnóstico calculado pelo Core, explicite se o tempo até encher está indisponível por falta de confiança. Não invente estimativas.'
             : 'São dados oficiais e de campo: não confunda nível de estação hidrológica com nível de bueiro.',
           'Descreva tendências observadas, dados disponíveis e limitações em até três parágrafos.',
           JSON.stringify(fontes).slice(0, 25000)
@@ -220,7 +226,9 @@ export default async function rotasIA(app, { ctx }) {
               fonte: f.fonte, tipo: f.tipo, registros: f.registros.length
             })),
             aviso: 'Análise consultiva, sem alteração de risco ou alertas.' };
-          contextuais.set(modo, { valor, expira: Date.now() + 30 * 60_000 });
+          // O painel consulta a cada 5s, mas o provedor não deve ser acionado nessa frequência.
+          // No protótipo usamos cache de 90s para conciliar atualização e custo.
+          contextuais.set(modo, { valor, expira: Date.now() + (modo === 'prototipo' ? 90_000 : 30 * 60_000) });
           return valor;
         } finally { clearTimeout(timer); }
       } catch (erro) {
