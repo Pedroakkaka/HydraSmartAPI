@@ -43,11 +43,21 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-hydrasmart}:${POSTGRES_PASSWORD:-hydrasmart}@db:5432/${POSTGRES_DB:-hydrasmart}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
       SERIAL_ENABLED: "false"
+      # Chaves privadas vindas do .env da VPS (nunca versionar).
       INGEST_API_KEY: ${INGEST_API_KEY:-}
-      # Chave privada fornecida pelo ambiente da VPS ou arquivo .env local (nunca versionar).
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPERATOR_API_KEY: ${OPERATOR_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
+      ENABLE_AUTOMATIC_AI: ${ENABLE_AUTOMATIC_AI:-false}
+      ENABLE_PUBLIC_AI: ${ENABLE_PUBLIC_AI:-false}
       CEMADEN_JWT_TOKEN: ${CEMADEN_JWT_TOKEN:-}
-      TZ: America/Cuiaba
+      CEMADEN_EMAIL: ${CEMADEN_EMAIL:-}
+      CEMADEN_PASSWORD: ${CEMADEN_PASSWORD:-}
+      MUNICIPIO_NOME: ${MUNICIPIO_NOME:-Porto Alegre - RS}
+      MUNICIPIO_LATITUDE: ${MUNICIPIO_LATITUDE:--30.0346}
+      MUNICIPIO_LONGITUDE: ${MUNICIPIO_LONGITUDE:--51.2177}
+      MUNICIPIO_TIMEZONE: ${MUNICIPIO_TIMEZONE:-America/Sao_Paulo}
+      TZ: ${MUNICIPIO_TIMEZONE:-America/Sao_Paulo}
     ports:
       - "127.0.0.1:${API_PORT:-3333}:3333"
     networks: [hydrasmart]
