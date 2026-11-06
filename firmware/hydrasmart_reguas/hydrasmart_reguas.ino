@@ -5,7 +5,8 @@
  *
  * LIGAÇÃO
  *  - Bueiro 01: A0 A1 A2 A3 A4 A5  (contato mais baixo -> mais alto)  leitura ANALÓGICA
- *  - Bueiro 02: D2 D3 D4 D5 D6 D7  (contato mais baixo -> mais alto)  leitura DIGITAL
+ *  - Bueiro 02: D7 D6 D5 D4 D3 D2  (contato mais baixo -> mais alto)  leitura DIGITAL
+ *    (na régua montada: marrom=D7 embaixo, junto ao GND amarelo; vermelho=D2 no topo)
  *  - Em cada compartimento, um fio de referência ligado ao GND do Arduino, até o fundo.
  *  - Não acionar bombas pelos pinos do Arduino. Nunca ligar 9 V em pinos de sinal.
  *
@@ -32,7 +33,7 @@ const unsigned long INTERVALO_MS = 1000;
 
 const byte TOTAL_CONTATOS = 6;
 const byte PINOS_B1[TOTAL_CONTATOS] = {A0, A1, A2, A3, A4, A5};
-const byte PINOS_B2[TOTAL_CONTATOS] = {2, 3, 4, 5, 6, 7};
+const byte PINOS_B2[TOTAL_CONTATOS] = {7, 6, 5, 4, 3, 2}; // do contato mais baixo ao mais alto
 
 bool molhadoB1[TOTAL_CONTATOS] = {false, false, false, false, false, false};
 unsigned long ultimaMedicao = 0;
