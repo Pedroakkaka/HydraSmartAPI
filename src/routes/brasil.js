@@ -1,4 +1,5 @@
 import { FONTES_NACIONAIS, obterNivelBlumenau } from '../services/fontesBrasil.js';
+import { catalogoMunicipios, sugestoesMunicipios } from '../services/buscaMunicipios.js';
 
 const cacheMeteorologia = new Map();
 const numeroDisponivel = v => v === null || v === undefined || v === '' ? null : Number.isFinite(Number(v)) ? Number(v) : null;
@@ -99,6 +100,22 @@ async function consultarDrenagem(lat, lon) {
 }
 
 export default async function rotasBrasil(app) {
+  app.get('/brasil/cidades-sugestoes', {
+    schema: { tags: ['Fontes externas'], querystring: {
+      type: 'object', required: ['busca'], additionalProperties: false,
+      properties: { busca: { type: 'string', minLength: 2, maxLength: 80 } }
+    }}
+  }, async (req, reply) => {
+    try {
+      const lista = await catalogoMunicipios();
+      return { status: 'sucesso', fonte: 'IBGE Localidades',
+        cidades: sugestoesMunicipios(lista, req.query.busca) };
+    } catch (err) {
+      req.log.warn({ mensagem: err.message }, 'Catálogo de municípios indisponível');
+      return reply.code(503).send({ erro: 'Sugestões temporariamente indisponíveis.' });
+    }
+  });
+
   app.get('/brasil/cidades', {
     schema: { tags: ['Fontes externas'], querystring: {
       type: 'object', required: ['busca'], additionalProperties: false,
