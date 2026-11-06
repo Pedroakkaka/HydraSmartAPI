@@ -50,7 +50,7 @@ export function diagnosticarPrototipo(leitura, agora = Date.now()) {
     : taxa < -0.3 && deltaPct < 0 ? 'descendo' : 'estavel';
   const confiavel = janelaSegundos >= 25 && amostras >= 10 &&
     subidas >= 2 && quedas === 0 && deltaPct >= 16 &&
-    taxa >= 0.5 && taxa <= 50;
+    taxa >= 0.5 && taxa <= 180;
   const horizonte = alvo => {
     if (!confiavel || nivel >= alvo) return nivel >= alvo ? 0 : null;
     const minutos = (alvo-nivel)/taxa;
