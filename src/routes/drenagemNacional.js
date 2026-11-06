@@ -17,9 +17,16 @@ const CAMADAS_OFICIAIS = [
     nome:'SEDUH / Distrito Federal', id:'df', bounds:[-48.25,-16.05,-47.45,-15.55],
     url:'https://sisdia.df.gov.br/server/rest/services/02_CARACTERIZACAO/Boca_de_Lobo_CACHE/MapServer/0/query',
     campo:'objectid'
+  },
+  {
+    nome:'Prefeitura de São José dos Pinhais', id:'sjp', bounds:[-49.36,-25.68,-49.11,-25.43],
+    url:'https://geo.sjp.pr.gov.br/server/rest/services/Infraestrutura/Infraestrutura/MapServer/73/query',
+    campo:'objectid'
   }
 ];
 const cache = new Map();
+let consultasOsmAtivas = 0;
+const MAX_OSM_SIMULTANEAS = 2;
 const emAndamento = new Map();
 const validos = (a) => a.length === 4 && a.every(Number.isFinite);
 export function validarBbox(raw) {
@@ -69,6 +76,13 @@ async function consultarOficiais(c) {
 }
 
 async function consultarOsm(c) {
+  // Overpass é compartilhado: consultas paralelas demais causam timeout e
+  // rate limiting, especialmente ao arrastar/centralizar o mapa rapidamente.
+  if (consultasOsmAtivas >= MAX_OSM_SIMULTANEAS) {
+    throw new Error('Servidor OSM ocupado, aproxime o mapa ou tente novamente');
+  }
+  consultasOsmAtivas++;
+  try {
   const [w,s,e,n] = c;
   const b = [s,w,n,e].join(',');
   const query = '[out:json][timeout:18];(' +
@@ -97,15 +111,18 @@ async function consultarOsm(c) {
     } catch (err) { last = err; }
   }
   throw last || new Error('OSM indisponível');
+  } finally { consultasOsmAtivas--; }
 }
 
 async function buscar(c) {
   const [oficial, osm] = await Promise.allSettled([consultarOficiais(c), consultarOsm(c)]);
-  const fonteOficial = oficial.status === 'fulfilled' ? oficial.value : {elementos:[], ativo:false};
+  const fonteOficial = oficial.status === 'fulfilled' ? oficial.value : {elementos:[], erros:1};
   const fonteOsm = osm.status === 'fulfilled' ? osm.value : {status:'indisponivel',elementos:[]};
-  if (oficial.status === 'rejected' && osm.status === 'rejected') {
+  // Se não há fonte oficial consultável para a área, o Overpass precisa ter
+  // respondido de verdade. Falha externa não deve virar "zero bueiros".
+  if (osm.status === 'rejected' && fonteOficial.elementos.length === 0) {
     return {status:'indisponivel', elementos:[], contagem:{oficiais:0,colaborativos:0},
-      mensagem:'Fontes indisponíveis. Nenhuma conclusão pode ser feita sobre a existência de bueiros.'};
+      mensagem:'Serviço público OSM indisponível ou sobrecarregado. Não é possível determinar a existência de bueiros nesta área.'};
   }
   const todos = [...fonteOficial.elementos, ...fonteOsm.elementos];
   const unicos = [...new Map(todos.map(x => [x.id,x])).values()];
@@ -114,7 +131,7 @@ async function buscar(c) {
     contagem:{oficiais:fonteOficial.elementos.length,colaborativos:fonteOsm.elementos.length},
     cobertura:'parcial', parcial:Boolean(fonteOficial.parcial || fonteOsm.parcial),
     consultadoEm:new Date().toISOString(),
-    fontes:['Prefeitura de Juiz de Fora (onde há cobertura)', 'SEDUH / Distrito Federal (onde há cobertura)', 'OpenStreetMap'],
+    fontes:['Prefeitura de Juiz de Fora (onde há cobertura)', 'SEDUH / Distrito Federal (onde há cobertura)', 'Prefeitura de São José dos Pinhais (onde há cobertura)', 'OpenStreetMap'],
     mensagem:'Cobertura parcial. A ausência de registros não comprova inexistência de bocas de lobo. Nenhum ponto implica sensor instalado.'};
 }
 
