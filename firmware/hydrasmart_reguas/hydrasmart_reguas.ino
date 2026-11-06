@@ -18,7 +18,13 @@
  * BUEIRO 02 (pinos digitais)
  *  Os pinos D2-D7 não medem valor. Com água de torneira eles tendem a ficar "secos".
  *  Para funcionar: uma pitada de sal na água daquele compartimento, ou resistores de
- *  pull-up externos de ~220 kΩ (ver docs). As leituras dele são enviadas igualmente.
+ *  pull-up externos de ~220 kΩ, ou um fio de GND desencapado ao longo de toda a régua.
+ *
+ *  Testado em bancada (06/11/2026):
+ *   - água de torneira, compartimento cheio: B02 detectava só o contato colado no GND;
+ *   - com uma pitada de sal: B02 detectou os contatos corretamente (50% = 50% do B01)
+ *     e o B01 passou a ler ~100 nos contatos molhados (antes ~450), com folga maior.
+ *  Água salgada corrói os contatos mais rápido: trocar a água ao fim de cada dia de uso.
  *
  * MENSAGEM ENVIADA (uma por bueiro, a cada segundo)
  *  {"bueiro":1,"nivel_pct":50.0,"contatos_ativos":3,"raw":7,"adc":[427,480,565,1023,1023,1023]}
