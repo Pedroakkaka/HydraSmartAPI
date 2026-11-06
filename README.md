@@ -1,6 +1,9 @@
 # HydraSmart API
 
-Back-end do **HydraSmart**, a plataforma de monitoramento de drenagem urbana e prevenção de alagamentos de Cáceres-MT.
+> **Histórico de desenvolvimento:** veja [docs/REGISTRO_DESENVOLVIMENTO.md](docs/REGISTRO_DESENVOLVIMENTO.md) para o registro cronológico das alterações discutidas, decisões, commits, testes, publicações e pendências.
+
+
+Back-end do **HydraSmart**, a plataforma de monitoramento de drenagem urbana e prevenção de alagamentos de Porto Alegre-RS.
 
 A API lê os sensores do Arduino pela USB, calcula o nível de água de cada bueiro, grava o histórico no PostgreSQL, dispara alertas críticos e envia tudo em tempo real para o painel ([HydraSmartFront](https://github.com/Pedroakkaka/HydraSmartFront)).
 
@@ -100,6 +103,10 @@ curl -X POST http://SEU-SERVIDOR/api/v1/leituras \
   -H "Content-Type: application/json" -H "X-API-Key: SUA_CHAVE" \
   -d '{"bueiroId": 1, "distanciaCm": 14.5}'
 ```
+
+## Enviar o Arduino local para a API no Render
+
+Para receber **dados experimentais físicos** de uma placa ligada ao USB de um notebook (e acionar as notificações experimentais automáticas), execute a ponte autenticada descrita em [docs/PONTE_ARDUINO_RENDER.md](docs/PONTE_ARDUINO_RENDER.md). É necessária a chave de ambiente `PROTOTYPE_INGEST_API_KEY` no Render e no notebook. A API hospedada na nuvem não consegue acessar diretamente o USB do notebook; não exponha o segredo no navegador.
 
 ## Firmware do Arduino
 

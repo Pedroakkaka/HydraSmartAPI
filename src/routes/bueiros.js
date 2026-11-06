@@ -44,13 +44,12 @@ export default async function rotasBueiros(app, { ctx }) {
       }
     }
   }, async (req, reply) => {
-    const salvo = await ctx.calibracao.atualizar(req.params.id, req.body);
-    return salvo ? comConfirmacao(salvo) : naoEncontrado(reply);
+    return reply.code(403).send({ erro: 'Calibração física bloqueada no painel público. Apenas os parâmetros da simulação podem ser editados.' });
   });
 
   app.post('/bueiros/calibracao/restaurar', {
     schema: { tags: ['Bueiros'], summary: 'Restaura a calibração padrão dos dois bueiros (mantém coordenadas)' }
-  }, async () => (await ctx.calibracao.restaurarPadroes()).map(comConfirmacao));
+  }, async (req, reply) => reply.code(403).send({ erro: 'Restauração de calibração física desabilitada no painel público.' }));
 
   app.put('/bueiros/:id/coordenadas', {
     schema: {

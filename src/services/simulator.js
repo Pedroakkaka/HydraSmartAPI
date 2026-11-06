@@ -1,7 +1,7 @@
 /**
  * Simulador de cenários para o modo demonstração.
- * Gera leituras sintéticas (marcadas como simuladas) para os dois bueiros e a lâmina
- * d'água da rua usada pela maquete 3D. Nada do que é gerado aqui vai para o banco.
+ * Gera leituras sintéticas (marcadas como simuladas) para os dois bueiros.
+ * Nada do que é gerado aqui vai para o banco.
  */
 
 import { MODOS } from '../domain/telemetryState.js';
@@ -13,32 +13,28 @@ export const CENARIOS = [
     nome: '1. Drenagem Normal / Seco',
     descricao: 'Tempo estável. Bueiros em nível de segurança (20%), sarjetas limpas, sem alagamento na rua.',
     b1Alvo: 20.0,
-    b2Alvo: 18.0,
-    laminaRuaCm: 0.0
+    b2Alvo: 18.0
   },
   {
     id: 'chuva_moderada',
     nome: '2. Chuva Moderada (Atenção)',
     descricao: 'Precipitação contínua. Galerias pluviais em carga (~60%), retenção inicial de água nas sarjetas.',
     b1Alvo: 65.0,
-    b2Alvo: 58.0,
-    laminaRuaCm: 2.5
+    b2Alvo: 58.0
   },
   {
     id: 'tempestade_transbordo',
-    nome: '3. Tempestade Crítica / Transbordo na Rua',
-    descricao: "Galerias saturadas (>85%). Transbordo pelas grelhas e lâmina d'água de 12 cm sobre o asfalto.",
+    nome: '3. Tempestade Crítica / Níveis Simulados Elevados',
+    descricao: 'Cenário sintético de níveis elevados nos sensores; não representa uma medição de água na rua.',
     b1Alvo: 89.0,
-    b2Alvo: 93.0,
-    laminaRuaCm: 12.0
+    b2Alvo: 93.0
   },
   {
     id: 'refluxo_rio',
-    nome: '4. Remanso do Rio Paraguai / Refluxo Total',
-    descricao: 'Remanso hidrostático severo. Drenagem bloqueada com transbordo de 100% cobrindo a pista e calçadas.',
+    nome: '4. Refluxo simulado associado ao Guaíba',
+    descricao: 'Cenário sintético de níveis críticos nos sensores; não representa medição ou previsão do Guaíba.',
     b1Alvo: 100.0,
-    b2Alvo: 100.0,
-    laminaRuaCm: 24.0
+    b2Alvo: 100.0
   }
 ];
 
@@ -67,7 +63,7 @@ export class Simulator {
       this.estado.definirModo(MODOS.DEMO);
       this.estado.resetarBueiros('Modo demonstração');
     }
-    this.estado.atualizarSimulacao({ ativo: true, pausado: false, cenario: cenario.id, laminaRuaCm: cenario.laminaRuaCm });
+    this.estado.atualizarSimulacao({ ativo: true, pausado: false, cenario: cenario.id });
     this._agendar();
     await this._ciclo();
     this.log.info(`[simulador] cenário ativo: ${cenario.nome}`);
@@ -78,7 +74,7 @@ export class Simulator {
     if (!cenario) return false;
     this.cenario = cenario;
     if (this.estado.simulacao.ativo) {
-      this.estado.atualizarSimulacao({ cenario: cenario.id, laminaRuaCm: cenario.laminaRuaCm });
+      this.estado.atualizarSimulacao({ cenario: cenario.id });
       await this._ciclo();
     } else {
       this.estado.atualizarSimulacao({ cenario: cenario.id });
@@ -105,7 +101,7 @@ export class Simulator {
     this._parar();
     this.fatorRampa = 1;
     await this.alertas.encerrarSimulados();
-    this.estado.atualizarSimulacao({ ativo: false, pausado: false, laminaRuaCm: 0 });
+    this.estado.atualizarSimulacao({ ativo: false, pausado: false });
     this.estado.definirModo(MODOS.REAL);
     this.estado.resetarBueiros('Aguardando leituras reais');
     this.log.info('[simulador] encerrado, retorno ao modo real');
@@ -132,7 +128,6 @@ export class Simulator {
 
     await this.ingest.registrar({ bueiroId: 'bueiro_1', nivelPct: nivel(this.cenario.b1Alvo), origem: ORIGENS.SIMULADOR });
     await this.ingest.registrar({ bueiroId: 'bueiro_2', nivelPct: nivel(this.cenario.b2Alvo), origem: ORIGENS.SIMULADOR });
-    this.estado.atualizarSimulacao({ laminaRuaCm: Math.round(this.cenario.laminaRuaCm * this.fatorRampa * 10) / 10 });
   }
 
   parar() {

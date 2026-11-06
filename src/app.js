@@ -17,6 +17,8 @@ import rotasOperacao from './routes/operacao.js';
 import rotasExternas from './routes/externos.js';
 import rotasRelatorios from './routes/relatorios.js';
 import rotasIA from './routes/ia.js';
+import rotasBrasil from './routes/brasil.js';
+import rotasDrenagemNacional from './routes/drenagemNacional.js';
 
 /**
  * @param {object} ctx Contexto criado por criarContexto()
@@ -77,24 +79,22 @@ export async function construirApp(ctx, { logger = false } = {}) {
   app.addHook('onRequest', async (req, reply) => {
     const path = req.url.split('?')[0];
     const isMutation = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method);
-    const isIngest = req.method === 'POST' && path === '/api/v1/leituras';
-    const isAI = req.method === 'POST' && path === '/api/v1/ia/analisar';
-    if (!isMutation || isIngest || isAI || !path.startsWith('/api/v1/')) return;
+    const isIngest = req.method === 'POST' && (path === '/api/v1/leituras' || path === '/api/v1/leituras/prototipo');
+    if (!isMutation || isIngest || !path.startsWith('/api/v1/')) return;
     if (!operatorKey) return reply.code(503).send({ erro: 'Operações administrativas desabilitadas: configure OPERATOR_API_KEY no backend.' });
     if (!chaveConfere(req.headers['x-operator-key'])) {
       return reply.code(401).send({ erro: 'Chave de operador necessária.' });
     }
   });
 
-  // Limite básico de consumo da IA por endereço de origem; não substitui
-  // autenticação e cotas no provedor Gemini.
+  // Limite básico adicional por endereço de origem; a rota também exige
+  // autenticação de operador e ativação explícita no backend.
   const aiHits = new Map();
   app.addHook('onRequest', async (req, reply) => {
     if (req.method !== 'POST' || req.url.split('?')[0] !== '/api/v1/ia/analisar') return;
-    // Fail closed: uma API pública não pode oferecer consumo livre da chave Gemini.
-    // A IA só é reativada após implementar autenticação segura do lado do servidor.
-    if (process.env.ENABLE_PUBLIC_AI !== 'true') {
-      return reply.code(503).send({ erro: 'Análise por IA temporariamente desabilitada para proteger a chave Gemini.' });
+    // Fail closed: uso pago exige chave de operador, flag explícita e chave do provedor.
+    if (!ctx.config.enablePublicAi || !ctx.config.cloudflareAccountId || !ctx.config.cloudflareApiToken) {
+      return reply.code(503).send({ erro: 'Análise por IA está desativada ou sem configuração segura no servidor.' });
     }
     const now = Date.now();
     const key = req.ip;
@@ -111,7 +111,7 @@ export async function construirApp(ctx, { logger = false } = {}) {
   await registrarWebSocket(app, ctx);
 
   await app.register(async (api) => {
-    for (const rotas of [rotasSistema, rotasBueiros, rotasLeituras, rotasOperacao, rotasExternas, rotasRelatorios, rotasIA]) {
+    for (const rotas of [rotasSistema, rotasBueiros, rotasLeituras, rotasOperacao, rotasExternas, rotasRelatorios, rotasIA, rotasBrasil, rotasDrenagemNacional]) {
       await api.register(rotas, { ctx });
     }
   }, { prefix: '/api/v1' });

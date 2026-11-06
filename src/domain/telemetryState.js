@@ -72,11 +72,17 @@ export class TelemetryState extends EventEmitter {
       errosParser: 0
     };
 
+    // Canais separados por procedência: nunca confundir bancada, cenário e campo.
+    this.canais = {
+      prototipo: {},
+      demonstracao: {},
+      campo: {}
+    };
+
     this.simulacao = {
       ativo: false,
       pausado: false,
       cenario: 'chuva_moderada',
-      laminaRuaCm: 0,
       horarioAtualizacao: null
     };
   }
@@ -132,6 +138,26 @@ export class TelemetryState extends EventEmitter {
 
     this._emitir('leitura');
     return { ...b };
+  }
+
+  registrarCanal(canal, id, leitura) {
+    if (!Object.hasOwn(this.canais, canal)) return;
+    const anterior = this.canais[canal][id];
+    const historicoNiveis = [...(anterior?.historicoNiveis || []), leitura.nivelPct].slice(-this.maxHistorico);
+    const historicoTimestamps = [...(anterior?.historicoTimestamps || []), leitura.timestamp].slice(-this.maxHistorico);
+    const historicoDistancias = [...(anterior?.historicoDistancias || []), leitura.distanciaCm].slice(-this.maxHistorico);
+    this.canais[canal][id] = {
+      bueiroId: id,
+      historicoNiveis, historicoTimestamps, historicoDistancias,
+      origem: leitura.origem,
+      nivelPct: leitura.nivelPct,
+      alturaAguaCm: leitura.alturaAguaCm,
+      distanciaCm: leitura.distanciaCm,
+      risco: leitura.risco,
+      timestamp: leitura.timestamp,
+      natureza: canal === 'demonstracao' ? 'sintetico' : canal === 'prototipo' ? 'experimental' : 'campo'
+    };
+    this._emitir('canal');
   }
 
   resetarBueiros(origem = 'Aguardando leituras reais') {
@@ -191,52 +217,6 @@ export class TelemetryState extends EventEmitter {
     if (mudou) this._emitir('liveness');
   }
 
-  /**
-   * Dados que alimentam a maquete 3D.
-   * 'simulado' no modo demonstração, 'real' com sensores ativos, 'indisponivel' sem dados.
-   */
-  estadoMaquete3D() {
-    const b1 = this.bueiros.bueiro_1;
-    const b2 = this.bueiros.bueiro_2;
-
-    if (this.modo === MODOS.DEMO && this.simulacao.ativo) {
-      return {
-        status: 'simulado',
-        origemTexto: 'Modo Demonstração (Dados Sintéticos)',
-        bueiro1Nivel: b1.valido ? b1.nivelPct : 0,
-        bueiro2Nivel: b2.valido ? b2.nivelPct : 0,
-        laminaRuaCm: this.simulacao.laminaRuaCm,
-        cenario: this.simulacao.cenario,
-        horario: this.simulacao.horarioAtualizacao
-      };
-    }
-
-    const ativos = [b1, b2].filter((b) => b.conectado && !b.desatualizado);
-    if (ativos.length) {
-      const maxN = Math.max(...ativos.map((b) => b.nivelPct));
-      return {
-        status: 'real',
-        origemTexto: 'Sensores Físicos Reais',
-        bueiro1Nivel: b1.conectado ? b1.nivelPct : null,
-        bueiro2Nivel: b2.conectado ? b2.nivelPct : null,
-        // Água na rua só aparece com transbordo (> 80%)
-        laminaRuaCm: maxN > 80 ? Math.round((maxN - 80) * 0.75 * 10) / 10 : 0,
-        cenario: 'monitoramento_real',
-        horario: Math.max(b1.timestamp || 0, b2.timestamp || 0)
-      };
-    }
-
-    return {
-      status: 'indisponivel',
-      origemTexto: 'Aguardando dados para iniciar a simulação',
-      bueiro1Nivel: null,
-      bueiro2Nivel: null,
-      laminaRuaCm: 0,
-      cenario: 'indisponivel',
-      horario: null
-    };
-  }
-
   snapshot() {
     const bueiros = {};
     for (const [id, b] of Object.entries(this.bueiros)) {
@@ -254,7 +234,11 @@ export class TelemetryState extends EventEmitter {
       bueiros,
       serial: { ...this.serial },
       simulacao: { ...this.simulacao },
-      maquete3D: this.estadoMaquete3D(),
+      canais: Object.fromEntries(
+        Object.entries(this.canais).map(([canal, dados]) => [
+          canal, Object.fromEntries(Object.entries(dados).map(([id, leitura]) => [id, { ...leitura }]))
+        ])
+      ),
       geradoEm: Date.now()
     };
   }

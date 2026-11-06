@@ -3,6 +3,7 @@
  */
 
 import { CENARIOS } from '../services/simulator.js';
+import { normalizarBueiroId, sanitizarParametros } from '../core/calibration.js';
 
 const corpoCenario = {
   type: 'object',
@@ -93,6 +94,61 @@ export default async function rotasOperacao(app, { ctx }) {
   }, async () => {
     await ctx.simulador.encerrar();
     return ctx.snapshotCompleto();
+  });
+
+  // ---------------- Receptor estritamente interno de testes ----------------
+  app.get('/defesa-civil/simulador', {
+    schema: { tags: ['Simulação'], summary: 'Recibos internos de alerta; nenhuma transmissão externa' }
+  }, async () => ({
+    simulacao: true,
+    transmissaoExterna: false,
+    registros: ctx.simuladorDefesaCivil?.listar() || []
+  }));
+
+  // Parâmetros exclusivos da simulação; nunca persistem no banco e jamais
+  // alteram a calibração física ou o processamento do Arduino/HTTP.
+  app.get('/simulacao/calibracao', async () => ({
+    calibracoes: Object.fromEntries(Object.entries(ctx.estado.calibracoes).map(([id, cfg]) =>
+      [id, { ...cfg, ...(ctx.ingest.calibracoesDemonstracao[id] || {}) }]
+    )),
+    natureza: 'somente_simulacao'
+  }));
+
+  app.put('/simulacao/calibracao/:id', {
+    schema: {
+      tags: ['Simulação'],
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+      body: {
+        type: 'object', additionalProperties: false,
+        properties: {
+          alturaTotalCm: { type: 'number', minimum: 5, maximum: 500 },
+          distanciaCegaCm: { type: 'number', minimum: 0, maximum: 100 },
+          volumeTotalMl: { type: 'number', minimum: 100 },
+          limiteAtencaoPct: { type: 'number', minimum: 10, maximum: 90 },
+          limiteCriticoPct: { type: 'number', minimum: 15, maximum: 99 }
+        }
+      }
+    }
+  }, async (req, reply) => {
+    if (ctx.estado.modo !== 'demo' || !ctx.estado.simulacao.ativo) {
+      return reply.code(403).send({ erro: 'Ajustes permitidos somente durante uma simulação ativa.' });
+    }
+    const id = normalizarBueiroId(req.params.id);
+    if (!id || !ctx.estado.calibracoes[id]) return reply.code(404).send({ erro: 'Bueiro desconhecido.' });
+    const atual = ctx.ingest.calibracoesDemonstracao[id] || ctx.estado.calibracoes[id];
+    const cfg = sanitizarParametros(atual, req.body);
+    ctx.ingest.calibracoesDemonstracao[id] = cfg;
+    ctx.estado.emit('mudanca');
+    return { ...cfg, natureza: 'somente_simulacao', persistido: false };
+  });
+
+  app.post('/simulacao/calibracao/restaurar', async (req, reply) => {
+    if (ctx.estado.modo !== 'demo' || !ctx.estado.simulacao.ativo) {
+      return reply.code(403).send({ erro: 'Ajustes permitidos somente durante uma simulação ativa.' });
+    }
+    ctx.ingest.calibracoesDemonstracao = {};
+    ctx.estado.emit('mudanca');
+    return { status: 'restaurado', natureza: 'somente_simulacao', persistido: false };
   });
 
   // ---------------- Alertas ----------------

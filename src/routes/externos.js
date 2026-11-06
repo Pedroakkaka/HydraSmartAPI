@@ -141,6 +141,7 @@ export default async function rotasExternas(app, { ctx }) {
         cacheEstacoes = {
           fonte: 'Defesa Civil do Rio Grande do Sul',
           urlFonte: DEFESA_CIVIL_URL,
+          consultadoEm: new Date().toISOString(),
           proximaAtualizacaoEm: dados.tags_data.proximaAtualizacaoEm ?? null,
           estacoes: dados.tags_data.qualle_meteorologia.map(resumirEstacao)
         };
@@ -149,6 +150,14 @@ export default async function rotasExternas(app, { ctx }) {
       return { status: 'sucesso', ...cacheEstacoes };
     } catch (erro) {
       req.log.warn({ err: erro }, 'Falha Defesa Civil RS');
+      cacheAte = Date.now() + 60_000;
+      if (cacheEstacoes) {
+        return {
+          status: 'desatualizado',
+          ...cacheEstacoes,
+          erroMensagem: 'Consulta atual indisponível; exibindo a última resposta válida da Defesa Civil RS.'
+        };
+      }
       return reply.code(502).send({ erro: 'Consulta à Defesa Civil RS indisponível.', detalhe: erro.message });
     }
   });
@@ -190,7 +199,7 @@ export default async function rotasExternas(app, { ctx }) {
   });
 
   app.get('/cemaden', {
-    schema: { tags: ['Fontes externas'], summary: 'Dados da integração CEMADEN (estação ainda configurada para Cáceres)', querystring: queryForcar }
+    schema: { tags: ['Fontes externas'], summary: 'Dados da integração CEMADEN para Porto Alegre-RS', querystring: queryForcar }
   }, async (req) => ctx.cemaden.obter({ forcar: req.query.forcar }));
 
   app.get('/bocas-de-lobo', {
@@ -202,6 +211,6 @@ export default async function rotasExternas(app, { ctx }) {
   }, async (req) => ctx.osm.obterDrenos({ forcar: req.query.forcar }));
 
   app.get('/historico-oficial', {
-    schema: { tags: ['Fontes externas'], summary: 'Registros históricos existentes (ainda referentes a Cáceres; não usar como histórico de Porto Alegre)' }
+    schema: { tags: ['Fontes externas'], summary: 'Registros e referências históricas oficiais de Porto Alegre-RS' }
   }, async () => registrosOficiais);
 }

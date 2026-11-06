@@ -134,7 +134,7 @@ Dê **dois cliques** em `PARAR-HYDRASMART.bat`. As leituras gravadas ficam salva
 |---|---|
 | Leitura do Arduino, níveis e alertas | Mapa (imagens do OpenStreetMap) |
 | Banco de dados, histórico e relatórios | Clima (Open-Meteo) |
-| Gráficos e maquete 3D | CEMADEN |
+| Gráficos | CEMADEN |
 | Modo demonstração | Fontes do texto (o painel usa uma fonte padrão do Windows no lugar) |
 
 Dica: o roteador do celular resolve. Ligue o notebook nele antes de iniciar o sistema.
