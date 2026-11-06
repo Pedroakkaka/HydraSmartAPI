@@ -41,5 +41,8 @@ export default async function rotasSistema(app, { ctx }) {
 
   app.get('/estado', {
     schema: { tags: ['Sistema'], summary: 'Estado completo ao vivo (o mesmo enviado pelo WebSocket /ws)' }
-  }, async () => ctx.snapshotCompleto());
+  }, async (req, reply) => {
+    reply.header('Cache-Control', 'no-store, no-cache, must-revalidate');
+    return ctx.snapshotCompleto();
+  });
 }
