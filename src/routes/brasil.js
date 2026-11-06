@@ -1,6 +1,7 @@
 import { FONTES_NACIONAIS, obterNivelBlumenau } from '../services/fontesBrasil.js';
 
 const cacheMeteorologia = new Map();
+const numeroDisponivel = v => v === null || v === undefined || v === '' ? null : Number.isFinite(Number(v)) ? Number(v) : null;
 
 async function consultarTempoLocal(lat, lon) {
   // Reduz precisão para ~100 m, evita registrar posição exata e amplia cache.
@@ -21,15 +22,15 @@ async function consultarTempoLocal(lat, lon) {
   const json = await resposta.json();
   const horas = (json.hourly?.time || []).slice(0, 6).map((horario, i) => ({
     horario,
-    precipitacaoMm: Number.isFinite(Number(json.hourly?.precipitation?.[i])) ? Number(json.hourly.precipitation[i]) : null,
-    probabilidadeChuvaPct: Number.isFinite(Number(json.hourly?.precipitation_probability?.[i])) ? Number(json.hourly.precipitation_probability[i]) : null
+    precipitacaoMm: numeroDisponivel(json.hourly?.precipitation?.[i]),
+    probabilidadeChuvaPct: numeroDisponivel(json.hourly?.precipitation_probability?.[i])
   }));
   const valido = horas.filter(h => h.precipitacaoMm !== null);
   const total6h = valido.length ? Number(valido.reduce((acc, h) => acc + h.precipitacaoMm, 0).toFixed(1)) : null;
   const dados = {
     status: 'sucesso', fonte: 'Open-Meteo Forecast API',
     coordenadasAproximadas: { latitude, longitude },
-    precipAtualMm: Number.isFinite(Number(json.current?.precipitation)) ? Number(json.current.precipitation) : null,
+    precipAtualMm: numeroDisponivel(json.current?.precipitation),
     previsao6hMm: total6h, horas, consultadoEm: new Date().toISOString(),
     interpretacao: total6h === null ? 'Sem previsão disponível' : total6h >= 30 ? 'Volume previsto elevado nas próximas 6 horas' : total6h >= 10 ? 'Chuva prevista nas próximas 6 horas' : 'Acumulado previsto baixo nas próximas 6 horas',
     aviso: 'Condição meteorológica estimada, não é probabilidade de alagamento, aviso oficial nem medição de bueiro.'
