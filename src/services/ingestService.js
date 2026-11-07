@@ -52,6 +52,7 @@ export class IngestService {
       ...anterior, id, bueiroId: id, nome: this.estado.calibracoes[id].nome,
       conectado: true, valido: true, desatualizado: false,
       origem: leitura.origem, timestamp: leitura.timestamp,
+      natureza: canal === 'demonstracao' ? 'sintetico' : canal === 'prototipo' ? 'experimental' : 'campo',
       tipoMedicao: leitura.tipoMedicao,
       distanciaCm: leitura.distanciaCm, distanciaMedidaCm: leitura.distanciaCm,
       nivelPct: leitura.nivelPct, alturaAguaCm: leitura.alturaAguaCm,
