@@ -110,13 +110,24 @@ Para receber **dados experimentais físicos** de uma placa ligada ao USB de um n
 
 ## Firmware do Arduino
 
-O firmware está em [`firmware/hydrasmart_firmware.ino`](firmware/hydrasmart_firmware.ino). Ele envia uma linha JSON por sensor a cada segundo, em 115200 baud:
+O protótipo usa **duas réguas de eletrodos** (6 contatos cada) num Arduino Uno. O firmware é o [`firmware/hydrasmart_reguas/hydrasmart_reguas.ino`](firmware/hydrasmart_reguas/hydrasmart_reguas.ino). Ele envia uma linha JSON por bueiro a cada segundo, em 115200 baud:
 
 ```json
-{"bueiro":1,"dist_cm":14.5,"raw":145}
+{"bueiro":1,"nivel_pct":50.0,"contatos_ativos":3,"raw":7,"adc":[427,480,565,1023,1023,1023]}
+{"bueiro":2,"nivel_pct":33.3,"contatos_ativos":2,"raw":3}
 ```
 
-Pinagem: Bueiro 01 com TRIG em D9 e ECHO em D10. Bueiro 02 com TRIG em D6 e ECHO em D7. Os dois sensores usam 5V e GND.
+| Bueiro | Pinos (contato de baixo → de cima) | Leitura |
+|---|---|---|
+| B01 | A0 A1 A2 A3 A4 A5 | Analógica: molhado abaixo de 800, seco acima de 900 (calibrado em bancada) |
+| B02 | D7 D6 D5 D4 D3 D2 | Digital |
+
+- Cada compartimento precisa de um fio de referência ligado ao GND do Arduino, chegando ao fundo.
+- Use água de torneira com uma pitada de sal. Sem sal, os pinos digitais do B02 não detectam os contatos de cima.
+- Para investigar uma régua que não lê, grave o [`firmware/diagnostico_eletrodos`](firmware/diagnostico_eletrodos/diagnostico_eletrodos.ino), que mostra o valor de cada contato.
+- O firmware antigo do sensor ultrassônico HC-SR04 (`firmware/hydrasmart_firmware.ino`) continua aceito pela API, mas não é mais o hardware do protótipo.
+
+Montagem, gravação e problemas comuns estão no [guia de instalação](docs/INSTALACAO.md) e no [PDF para imprimir](docs/Guia-Instalacao-HydraSmart.pdf).
 
 ## Banco de dados
 
