@@ -20,6 +20,7 @@ test('canais isolados: Arduino alimenta prot√≥tipo; HTTP alimenta campo; simula√
     bueiroId: 'bueiro_1', nivelPct: 25, origem: ORIGENS.ARDUINO_USB, timestamp
   })).aceita, true);
   assert.equal(ingest.snapshotCanais().prototipo.bueiro_1.nivelPct, 25);
+  assert.equal(ingest.snapshotCanais().prototipo.bueiro_1.natureza, 'experimental');
   assert.equal(Object.keys(ingest.snapshotCanais().campo).length, 0);
   assert.equal((await ingest.registrar({
     bueiroId: 'bueiro_1', nivelPct: 70, origem: ORIGENS.HTTP, timestamp

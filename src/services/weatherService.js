@@ -1,5 +1,5 @@
 /**
- * Meteorologia oficial (Open-Meteo) para Cáceres-MT, consultada pelo servidor com cache de 10 min.
+ * Meteorologia oficial (Open-Meteo) para o município configurado (Porto Alegre-RS por padrão), com cache de 10 min.
  *
  * Regra: não somar rain_sum com precipitation_sum (a chuva já faz parte da precipitação).
  * Previsão não é apresentada como medição dos bueiros nem como dado do CEMADEN.

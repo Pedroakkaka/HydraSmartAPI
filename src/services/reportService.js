@@ -14,9 +14,10 @@ const celula = (v) => {
 };
 
 export class ReportService {
-  constructor({ repositorios, estado }) {
+  constructor({ repositorios, estado, municipio }) {
     this.repo = repositorios;
     this.estado = estado;
+    this.municipio = municipio;
   }
 
   /** CSV separado por ";" (abre direto no Excel em pt-BR). */
@@ -42,7 +43,7 @@ export class ReportService {
     return {
       plataforma: 'HydraSmart',
       versaoApi: '3.0.0',
-      municipio: 'Cáceres - MT',
+      municipio: this.municipio,
       geradoEm: new Date().toISOString(),
       periodo: { desde: desde ?? null, ate: ate ?? null },
       regras: {

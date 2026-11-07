@@ -14,6 +14,7 @@ export class AlertService extends EventEmitter {
     this.repo = repositorios.alertas;
     this.log = log;
     this.abertos = new Map(); // chave "bueiro_1:real" -> alerta
+    this.faixasTestePrototipo = new Map(); // um aviso ao entrar em atenção, rearmado ao normalizar
   }
 
   async inicializar() {
@@ -21,13 +22,37 @@ export class AlertService extends EventEmitter {
     await this.repo.encerrarTodosAbertos();
   }
 
-  _chave(bueiroId, simulado) {
-    return `${bueiroId}:${simulado ? 'simulado' : 'real'}`;
+  _chave(bueiroId, simulado, canal = null) {
+    return `${bueiroId}:${canal || (simulado ? 'simulado' : 'real')}`;
   }
 
-  async avaliar({ bueiroId, nomeBueiro, nivelPct, risco }, { simulado }) {
-    const chave = this._chave(bueiroId, simulado);
+  async avaliar({ bueiroId, nomeBueiro, nivelPct, risco }, { simulado, canal = null }) {
+    const chave = this._chave(bueiroId, simulado, canal);
     const aberto = this.abertos.get(chave);
+
+    // Notificação didática: ao atingir a faixa de ATENÇÃO pela primeira vez,
+    // emitir um evento do protótipo. Leituras seguintes na mesma faixa não repetem.
+    // Nenhum SMS, push externo ou aviso oficial é emitido aqui.
+    if (canal === 'prototipo' && simulado === true) {
+      const anterior = this.faixasTestePrototipo.get(bueiroId) || 'normal';
+      if (risco === 'normal' || risco === 'desconhecido') {
+        this.faixasTestePrototipo.set(bueiroId, risco);
+      } else if (risco === 'atencao' && anterior !== 'atencao' && anterior !== 'critico') {
+        this.faixasTestePrototipo.set(bueiroId, 'atencao');
+        this.emit('alerta', {
+          acao: 'nivel_alto_teste',
+          alerta: {
+            id: 'atencao-prototipo-' + bueiroId + '-' + Date.now(),
+            bueiroId, simulado: true, canal: 'prototipo',
+            nivelPctPico: nivelPct,
+            mensagem: '[TESTE PROTÓTIPO] Nível alto de bancada no ' + nomeBueiro
+              + ' (' + nivelPct.toFixed(1) + '%). TESTE DO SISTEMA — NÃO É EMERGÊNCIA. Nenhuma ação necessária.'
+          }
+        });
+      } else {
+        this.faixasTestePrototipo.set(bueiroId, risco);
+      }
+    }
 
     try {
       if (RiskRules.exigeAlertaEmergencia(risco)) {
@@ -36,7 +61,9 @@ export class AlertService extends EventEmitter {
             bueiroId,
             nivelPct,
             simulado,
-            mensagem: `Nível crítico no ${nomeBueiro} (${nivelPct.toFixed(1)}%). Risco iminente de transbordo!`
+            mensagem: simulado
+              ? `[TESTE ${canal === 'prototipo' ? 'PROTÓTIPO' : 'SIMULAÇÃO'}] Nível crítico no ${nomeBueiro} (${nivelPct.toFixed(1)}%). Não é um alerta à população.`
+              : `Nível crítico no ${nomeBueiro} (${nivelPct.toFixed(1)}%). Risco iminente de transbordo!`
           });
           this.abertos.set(chave, alerta);
           this.emit('alerta', { acao: 'disparado', alerta });
