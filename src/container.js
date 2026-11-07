@@ -5,6 +5,7 @@
 
 import { TelemetryState } from './domain/telemetryState.js';
 import { AlertService } from './services/alertService.js';
+import { SimuladorDefesaCivil } from './services/simuladorDefesaCivil.js';
 import { IngestService } from './services/ingestService.js';
 import { Simulator } from './services/simulator.js';
 import { WeatherService } from './services/weatherService.js';
@@ -27,6 +28,7 @@ export async function criarContexto({ config, repositorios, log }) {
 
   const alertas = new AlertService({ repositorios, log });
   await alertas.inicializar();
+  const simuladorDefesaCivil = new SimuladorDefesaCivil({ alertas });
 
   const ingest = new IngestService({ estado, repositorios, alertas, log });
   const simulador = new Simulator({ estado, ingest, alertas, log });
@@ -35,7 +37,7 @@ export async function criarContexto({ config, repositorios, log }) {
   const cemaden = new CemadenService({ token: config.cemadenToken, email: config.cemadenEmail, senha: config.cemadenSenha, log });
   const osm = new OsmService({ log });
   const bocasLobo = new BocasLoboService({ log });
-  const relatorios = new ReportService({ repositorios, estado });
+  const relatorios = new ReportService({ repositorios, estado, municipio: config.municipio.nome });
 
   // Sinaliza bueiros sem leitura recente (vale para USB e para dispositivos HTTP).
   const timerLiveness = setInterval(
@@ -86,6 +88,7 @@ export async function criarContexto({ config, repositorios, log }) {
     repositorios,
     estado,
     alertas,
+    simuladorDefesaCivil,
     ingest,
     simulador,
     serial,
@@ -97,12 +100,13 @@ export async function criarContexto({ config, repositorios, log }) {
     calibracao,
 
     snapshotCompleto() {
-      return { ...estado.snapshot(), canais: ingest.snapshotCanais(), alertasAtivos: alertas.ativos() };
+      return { ...estado.snapshot(), canais: ingest.snapshotCanais(), simulacaoCalibracoes: { ...ingest.calibracoesDemonstracao }, alertasAtivos: alertas.ativos() };
     },
 
     async encerrar() {
       clearInterval(timerLiveness);
       simulador.parar();
+      simuladorDefesaCivil.encerrar();
       await serial.encerrar();
       await repositorios.fechar();
     }

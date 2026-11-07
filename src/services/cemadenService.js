@@ -26,7 +26,30 @@ export class CemadenService {
   }
 
   async obter({ forcar = false } = {}) {
-    return this.cache.obter(() => this._consultar(), { forcar });
+    try {
+      return await this.cache.obter(async () => {
+        const resposta = await this._consultar();
+        if (['erro_conexao', 'erro_autenticacao'].includes(resposta.status)) {
+          const erro = new Error(resposta.mensagem);
+          erro.resposta = resposta;
+          throw erro;
+        }
+        return resposta;
+      }, { forcar });
+    } catch (erro) {
+      const falha = erro.resposta ?? {
+        status: 'erro_conexao',
+        mensagem: 'Não foi possível consultar o CEMADEN. Confira a integração no servidor.'
+      };
+      if (this.cache.valor?.dadosEstacaoPortoAlegre) {
+        return {
+          ...this.cache.valor,
+          status: 'desatualizado',
+          erroMensagem: falha.mensagem
+        };
+      }
+      return falha;
+    }
   }
 
   async _obterToken({ renovar = false } = {}) {

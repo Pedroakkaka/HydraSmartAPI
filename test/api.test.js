@@ -9,15 +9,19 @@ import { carregarConfig } from '../src/config.js';
 import { criarRepositoriosMemoria } from '../src/repositories/memoria.js';
 import { criarContexto } from '../src/container.js';
 import { construirApp } from '../src/app.js';
+import { CemadenService } from '../src/services/cemadenService.js';
+import { OsmService } from '../src/services/osmService.js';
+import { WeatherService } from '../src/services/weatherService.js';
+import { BocasLoboService } from '../src/services/bocasLoboService.js';
 
-const CHAVE_OPERADOR = 'chave-operador-teste';
-const OPERADOR = { 'x-operator-key': CHAVE_OPERADOR };
 const logMudo = { info() {}, warn() {}, error() {}, debug() {} };
+const operatorKey = 'test-only-hydrasmart-operator-key';
+const operatorHeaders = { 'x-operator-key': operatorKey };
 let ctx;
 let app;
 
 async function montar(env = {}) {
-  const config = carregarConfig({ NODE_ENV: 'test', SERIAL_ENABLED: 'false', OPERATOR_API_KEY: CHAVE_OPERADOR, ...env });
+  const config = carregarConfig({ NODE_ENV: 'test', SERIAL_ENABLED: 'false', OPERATOR_API_KEY: operatorKey, ...env });
   ctx = await criarContexto({ config, repositorios: criarRepositoriosMemoria(), log: logMudo });
   app = await construirApp(ctx);
   await app.ready();
@@ -66,6 +70,162 @@ test('X-API-Key é exigida quando configurada', async () => {
   assert.equal((await enviar({ bueiroId: 1, distanciaCm: 11 }, { 'x-api-key': 'segredo-123' })).statusCode, 201);
 });
 
+test('operações administrativas exigem a chave de operador', async () => {
+  const url = '/api/v1/simulacao/iniciar';
+  const payload = { cenario: 'chuva_moderada' };
+  assert.equal((await app.inject({ method: 'POST', url, payload })).statusCode, 401);
+  assert.equal((await app.inject({ method: 'POST', url, payload, headers: { 'x-operator-key': 'incorreta' } })).statusCode, 401);
+});
+
+test('IA permanece desativada sem ativação explícita e não chama serviço externo', async () => {
+  const fetchOriginal = globalThis.fetch;
+  let chamadasExternas = 0;
+  globalThis.fetch = async () => { chamadasExternas++; throw new Error('chamada externa inesperada'); };
+  try {
+    const semAutenticacao = await app.inject({ method: 'POST', url: '/api/v1/ia/analisar', payload: { pergunta: 'Teste sem dados pagos' } });
+    assert.equal(semAutenticacao.statusCode, 401);
+    const resposta = await app.inject({ method: 'POST', url: '/api/v1/ia/analisar', headers: operatorHeaders, payload: { pergunta: 'Teste sem dados pagos' } });
+    assert.equal(resposta.statusCode, 503);
+    assert.equal(chamadasExternas, 0);
+    assert.equal((await app.inject('/api/v1/ia/relatorio')).json().status, 'indisponivel');
+  } finally {
+    globalThis.fetch = fetchOriginal;
+  }
+});
+
+test('CEMADEN preserva a última resposta válida como desatualizada após falha', async () => {
+  const fetchOriginal = globalThis.fetch;
+  let chamadas = 0;
+  globalThis.fetch = async () => {
+    chamadas++;
+    if (chamadas > 1) throw new Error('indisponibilidade simulada');
+    return { ok: true, json: async () => ({ data: [{ municipio: 'Porto Alegre', codigo: 'estacao-teste', chuva: 2.4 }] }) };
+  };
+  try {
+    const cemaden = new CemadenService({ token: 'unit-test-token', log: logMudo, ttlMs: 0 });
+    const atual = await cemaden.obter();
+    const anterior = await cemaden.obter({ forcar: true });
+    assert.equal(atual.status, 'sucesso');
+    assert.equal(anterior.status, 'desatualizado');
+    assert.equal(anterior.ultimaConsulta, atual.ultimaConsulta);
+    assert.deepEqual(anterior.dadosEstacaoPortoAlegre, atual.dadosEstacaoPortoAlegre);
+    assert.ok(anterior.erroMensagem);
+  } finally {
+    globalThis.fetch = fetchOriginal;
+  }
+});
+
+test('Defesa Civil preserva a última consulta válida como desatualizada após falha', async () => {
+  const fetchOriginal = globalThis.fetch;
+  const nowOriginal = Date.now;
+  let agora = nowOriginal();
+  Date.now = () => agora;
+  globalThis.fetch = async () => ({
+    ok: true,
+    json: async () => ({ data: { tags_data: {
+      qualle_meteorologia: [{ codigo: 'DCRS-00044', name: { general: 'Estação teste' }, position: {}, data: {} }],
+      proximaAtualizacaoEm: null
+    } } })
+  });
+  try {
+    const atual = await app.inject('/api/v1/hidrologia/estacoes');
+    assert.equal(atual.statusCode, 200);
+    assert.equal(atual.json().status, 'sucesso');
+    const consultadoEm = atual.json().consultadoEm;
+    agora += 300_001;
+    globalThis.fetch = async () => { throw new Error('indisponibilidade simulada'); };
+    const anterior = await app.inject('/api/v1/hidrologia/estacoes');
+    assert.equal(anterior.statusCode, 200);
+    assert.equal(anterior.json().status, 'desatualizado');
+    assert.equal(anterior.json().consultadoEm, consultadoEm);
+    assert.equal(anterior.json().estacoes.length, 1);
+    assert.ok(anterior.json().erroMensagem);
+  } finally {
+    Date.now = nowOriginal;
+    globalThis.fetch = fetchOriginal;
+  }
+});
+
+test('Open-Meteo preserva a última resposta válida como desatualizada após falha', async () => {
+  const fetchOriginal = globalThis.fetch;
+  let chamadas = 0;
+  globalThis.fetch = async () => {
+    chamadas++;
+    if (chamadas > 1) throw new Error('indisponibilidade simulada');
+    return { ok: true, json: async () => ({ current: {
+      time: '2026-11-01T10:00', temperature_2m: 21, relative_humidity_2m: 70,
+      precipitation: 0, rain: 0, weather_code: 1
+    }, hourly: { time: [] }, daily: { time: [] } }) };
+  };
+  try {
+    const clima = new WeatherService({ municipio: carregarConfig({ NODE_ENV: 'test' }).municipio, log: logMudo, ttlMs: 0 });
+    const atual = await clima.obter();
+    const anterior = await clima.obter({ forcar: true });
+    assert.equal(atual.status, 'sucesso');
+    assert.equal(anterior.status, 'desatualizado');
+    assert.equal(anterior.horarioUltimaConsulta, atual.horarioUltimaConsulta);
+    assert.equal(anterior.temperatura, 21);
+    assert.ok(anterior.erroMensagem);
+    globalThis.fetch = async () => { throw new Error('indisponibilidade simulada'); };
+    const semCache = await new WeatherService({ municipio: carregarConfig({ NODE_ENV: 'test' }).municipio, log: logMudo, ttlMs: 0 }).obter();
+    assert.equal(semCache.status, 'erro');
+    assert.equal(semCache.temperatura, null);
+    assert.equal(semCache.precipitacaoObservadaMm, null);
+  } finally {
+    globalThis.fetch = fetchOriginal;
+  }
+});
+
+test('OSM preserva cache vencido como desatualizado e não inventa elementos', async () => {
+  const fetchOriginal = globalThis.fetch;
+  let chamadas = 0;
+  globalThis.fetch = async () => {
+    chamadas++;
+    if (chamadas > 1) throw new Error('indisponibilidade simulada');
+    return { ok: true, json: async () => ({ elements: [{ id: 77, lat: -30.03, lon: -51.21, tags: { manhole: 'drain' } }] }) };
+  };
+  try {
+    const osm = new OsmService({ log: logMudo, ttlMs: 0 });
+    const atual = await osm.obterDrenos();
+    const anterior = await osm.obterDrenos({ forcar: true });
+    assert.equal(atual.status, 'sucesso');
+    assert.equal(anterior.status, 'desatualizado');
+    assert.equal(anterior.consultadoEm, atual.consultadoEm);
+    assert.deepEqual(anterior.elementos, atual.elementos);
+    assert.equal(chamadas, 4, 'três tentativas de servidores alternativos após a primeira resposta');
+
+    globalThis.fetch = async () => { throw new Error('indisponibilidade simulada'); };
+    const semCache = await new OsmService({ log: logMudo, ttlMs: 0 }).obterDrenos();
+    assert.equal(semCache.status, 'indisponivel');
+    assert.deepEqual(semCache.elementos, []);
+  } finally {
+    globalThis.fetch = fetchOriginal;
+  }
+});
+
+test('cadastro municipal preserva cache como desatualizado e sinaliza ausência sem cache', async () => {
+  const fetchOriginal = globalThis.fetch;
+  globalThis.fetch = async () => ({ ok: true, json: async () => ({ features: [{
+    attributes: { OBJECTID: 12, TIPO: 'boca_de_lobo' }, geometry: { y: -30.03, x: -51.21 }
+  }] }) });
+  try {
+    const servico = new BocasLoboService({ log: logMudo });
+    const atual = await servico.obter();
+    globalThis.fetch = async () => { throw new Error('indisponibilidade simulada'); };
+    const anterior = await servico.obter({ forcar: true });
+    assert.equal(atual.status, 'sucesso');
+    assert.equal(anterior.status, 'desatualizado');
+    assert.equal(anterior.consultadoEm, atual.consultadoEm);
+    assert.deepEqual(anterior.elementos, atual.elementos);
+
+    const semCache = await new BocasLoboService({ log: logMudo }).obter();
+    assert.equal(semCache.status, 'indisponivel');
+    assert.deepEqual(semCache.elementos, []);
+  } finally {
+    globalThis.fetch = fetchOriginal;
+  }
+});
+
 test('alerta crítico abre acima do limiar e encerra quando o nível baixa', async () => {
   await enviar({ bueiroId: 2, distanciaCm: 3 }); // 94,4%
   let ativos = (await app.inject('/api/v1/alertas?ativos=true')).json();
@@ -81,37 +241,39 @@ test('alerta crítico abre acima do limiar e encerra quando o nível baixa', asy
   assert.ok(todos[0].nivelPctPico > 98);
 });
 
-test('calibração altera a conversão das próximas leituras', async () => {
-  const r = await app.inject({ method: 'PUT', url: '/api/v1/bueiros/bueiro_1/calibracao', payload: { alturaTotalCm: 40, distanciaCegaCm: 4 } , headers: OPERADOR });
-  assert.equal(r.statusCode, 200);
-  const leitura = (await enviar({ bueiroId: 1, distanciaCm: 22 })).json();
-  assert.equal(leitura.nivelPct, 50); // (40-22)/36
-  const invalida = await app.inject({ method: 'PUT', url: '/api/v1/bueiros/1/calibracao', payload: { alturaTotalCm: 'abc' } , headers: OPERADOR });
-  assert.equal(invalida.statusCode, 400);
+test('calibração física fica bloqueada no painel público (decisão do time)', async () => {
+  const r = await app.inject({ method: 'PUT', url: '/api/v1/bueiros/bueiro_1/calibracao', payload: { alturaTotalCm: 40, distanciaCegaCm: 4 }, headers: operatorHeaders });
+  assert.equal(r.statusCode, 403);
+  const restaurar = await app.inject({ method: 'POST', url: '/api/v1/bueiros/calibracao/restaurar', headers: operatorHeaders });
+  assert.equal(restaurar.statusCode, 403);
+  // A conversão continua usando a calibração padrão (20 cm, zona cega 2 cm)
+  const leitura = (await enviar({ bueiroId: 1, distanciaCm: 11 })).json();
+  assert.equal(leitura.nivelPct, 50);
 });
 
 test('coordenadas são confirmadas e removidas', async () => {
-  const put = await app.inject({ method: 'PUT', url: '/api/v1/bueiros/2/coordenadas', payload: { latitude: -16.0718, longitude: -57.6789 } , headers: OPERADOR });
+  const put = await app.inject({ method: 'PUT', url: '/api/v1/bueiros/2/coordenadas', payload: { latitude: -30.0346, longitude: -51.2177 }, headers: operatorHeaders });
   assert.equal(put.json().coordenadasConfirmadas, true);
-  const del = await app.inject({ method: 'DELETE', url: '/api/v1/bueiros/2/coordenadas' , headers: OPERADOR });
+  const del = await app.inject({ method: 'DELETE', url: '/api/v1/bueiros/2/coordenadas', headers: operatorHeaders });
   assert.equal(del.json().coordenadasConfirmadas, false);
-  const fora = await app.inject({ method: 'PUT', url: '/api/v1/bueiros/2/coordenadas', payload: { latitude: 120, longitude: 0 } , headers: OPERADOR });
+  const fora = await app.inject({ method: 'PUT', url: '/api/v1/bueiros/2/coordenadas', payload: { latitude: 120, longitude: 0 }, headers: operatorHeaders });
   assert.equal(fora.statusCode, 400);
 });
 
 test('modo demonstração não grava dados simulados no banco', async () => {
-  const r = await app.inject({ method: 'POST', url: '/api/v1/simulacao/iniciar', payload: { cenario: 'tempestade_transbordo' } , headers: OPERADOR });
+  const r = await app.inject({ method: 'POST', url: '/api/v1/simulacao/iniciar', payload: { cenario: 'tempestade_transbordo' }, headers: operatorHeaders });
   assert.equal(r.statusCode, 200);
   const estado = r.json();
   assert.equal(estado.modo, 'demo');
   assert.ok(estado.bueiros.bueiro_1.nivelPct > 80);
-  assert.equal(estado.maquete3D.status, 'simulado');
+  assert.equal('laminaRuaCm' in estado.simulacao, false);
+  assert.equal('maquete3D' in estado, false);
   assert.equal(estado.alertasAtivos.length, 2);
 
   assert.equal((await app.inject('/api/v1/leituras')).json().length, 0);
   assert.equal((await app.inject('/api/v1/alertas')).json().length, 0, 'alertas simulados ficam fora da lista padrão');
 
-  const fim = (await app.inject({ method: 'POST', url: '/api/v1/simulacao/encerrar' , headers: OPERADOR })).json();
+  const fim = (await app.inject({ method: 'POST', url: '/api/v1/simulacao/encerrar', headers: operatorHeaders })).json();
   assert.equal(fim.modo, 'real');
   assert.equal(fim.alertasAtivos.length, 0);
   assert.equal(fim.bueiros.bueiro_1.conectado, false);
@@ -140,6 +302,12 @@ test('relatório CSV traz cabeçalho e leituras', async () => {
   assert.equal(linhas.length, 2);
 });
 
+test('relatório de auditoria identifica o município configurado', async () => {
+  const r = await app.inject('/api/v1/relatorios/auditoria.json');
+  assert.equal(r.statusCode, 200);
+  assert.equal(r.json().municipio, 'Porto Alegre - RS');
+});
+
 test('série histórica agrega leituras por intervalo', async () => {
   await enviar({ bueiroId: 1, distanciaCm: 11 }); // 50%
   await enviar({ bueiroId: 1, distanciaCm: 2 }); // 100%
@@ -161,7 +329,7 @@ test('ações de operador exigem a chave correta', async () => {
   assert.equal(semChave.statusCode, 401);
   const errada = await app.inject({ method: 'POST', url: '/api/v1/simulacao/iniciar', payload: {}, headers: { 'x-operator-key': 'outra' } });
   assert.equal(errada.statusCode, 401);
-  const certa = await app.inject({ method: 'POST', url: '/api/v1/simulacao/encerrar', headers: OPERADOR });
+  const certa = await app.inject({ method: 'POST', url: '/api/v1/simulacao/encerrar', headers: operatorHeaders });
   assert.equal(certa.statusCode, 200);
   // Leituras de sensores em campo usam a X-API-Key própria, não a chave do operador
   assert.equal((await enviar({ bueiroId: 1, distanciaCm: 11 })).statusCode, 201);
@@ -171,7 +339,7 @@ test('sem OPERATOR_API_KEY configurada as ações de operador ficam bloqueadas (
   await app.close();
   await ctx.encerrar();
   await montar({ OPERATOR_API_KEY: '' });
-  const r = await app.inject({ method: 'POST', url: '/api/v1/simulacao/iniciar', payload: {}, headers: OPERADOR });
+  const r = await app.inject({ method: 'POST', url: '/api/v1/simulacao/iniciar', payload: {}, headers: operatorHeaders });
   assert.equal(r.statusCode, 503);
 });
 
