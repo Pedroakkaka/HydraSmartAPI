@@ -134,6 +134,13 @@
   .rodape-final { margin-top: 18px; font-size: 8.5pt; color: var(--cinza); text-align: center; border-top: 1px solid var(--linha); padding-top: 8px; }
   .sim { color: var(--verde); font-weight: 700; }
   .nao { color: var(--vermelho); font-weight: 700; }
+
+  /* Paginação: cartões podem continuar na página seguinte; títulos, listas curtas e avisos ficam inteiros */
+  .passo { break-inside: auto; }
+  .passo-cab, h2, h3 { break-after: avoid; }
+  .passo ol, .passo ul, .nota, .alerta, .ok, pre, .duas-col { break-inside: avoid; }
+  table.compacta { font-size: 9pt; }
+  table.compacta td, table.compacta th { padding: 4px 7px; }
 </style>
 </head>
 <body>
@@ -150,8 +157,8 @@
     </div>
   </div>
   <h1>Guia de instalação em outro computador</h1>
-  <p>Como preparar qualquer notebook com Windows para rodar o sistema completo (banco de dados, API, painel e leitura do Arduino) e ligá-lo com dois cliques no dia da feira.</p>
-  <div class="meta">Versão do sistema: API v3.1.0 • Painel v3.0.1 &nbsp;|&nbsp; Repositórios: github.com/Pedroakkaka/HydraSmartAPI e HydraSmartFront</div>
+  <p>Como preparar qualquer notebook com Windows para rodar o sistema completo (banco de dados, API, painel e o protótipo físico com duas réguas de eletrodos) e ligá-lo com dois cliques no dia da feira.</p>
+  <div class="meta">Versão do sistema: API v3.3 • Painel v3.2 &nbsp;|&nbsp; Repositórios: github.com/Pedroakkaka/HydraSmartAPI e HydraSmartFront</div>
 </div>
 
 <div class="resumo">
@@ -162,7 +169,6 @@
 
 <div class="alerta"><strong>Faça a instalação com antecedência e com internet.</strong> No dia da feira só é preciso ligar o sistema.</div>
 
-<!-- ======================== REQUISITOS ======================== -->
 <div class="secao">
   <h2>O que o notebook precisa ter</h2>
   <table class="inteira">
@@ -176,8 +182,8 @@
   <div class="nota">Para conferir a virtualização: abra o <strong>Gerenciador de Tarefas → Desempenho → CPU</strong> e veja se "Virtualização" mostra <strong>Habilitado</strong>.</div>
 </div>
 
-<!-- ======================== PASSO 1 ======================== -->
-<div class="secao">
+<!-- ======================== INSTALAÇÃO ======================== -->
+<div class="secao" style="break-before: page">
   <h2>Instalação (uma vez por computador)</h2>
 
   <div class="passo">
@@ -188,13 +194,12 @@
       <li><strong>Node.js (versão LTS)</strong> — <a href="https://nodejs.org">nodejs.org</a></li>
       <li><strong>Docker Desktop</strong> — <a href="https://www.docker.com/products/docker-desktop">docker.com/products/docker-desktop</a>
         <ul>
-          <li>Na instalação, deixe marcado <strong>"Use WSL 2"</strong>.</li>
-          <li><strong>Reinicie o computador</strong> quando ele pedir.</li>
-          <li>Abra o Docker Desktop uma vez, aceite os termos e espere aparecer <strong>"Engine running"</strong> no canto inferior esquerdo. O login pode ser pulado.</li>
+          <li>Na instalação, deixe marcado <strong>"Use WSL 2"</strong> e <strong>reinicie o computador</strong> quando ele pedir.</li>
+          <li>Abra o Docker Desktop uma vez, aceite os termos e espere <strong>"Engine running"</strong>. O login não é necessário.</li>
           <li>Recomendado: em <em>Settings → General</em>, marque <strong>"Start Docker Desktop when you sign in"</strong>.</li>
         </ul>
       </li>
-      <li><strong>Driver do Arduino</strong>, só se a placa for um modelo compatível com chip CH340 (os mais baratos): <a href="http://www.wch-ic.com/downloads/CH341SER_EXE.html">wch-ic.com/downloads/CH341SER_EXE.html</a></li>
+      <li><strong>Driver do Arduino</strong>, só se a placa usar o chip CH340 (modelos mais baratos): <a href="http://www.wch-ic.com/downloads/CH341SER_EXE.html">wch-ic.com/downloads/CH341SER_EXE.html</a></li>
     </ol>
     <div class="nota">Se o Docker reclamar de WSL: abra o <strong>PowerShell como administrador</strong>, rode <code>wsl --update</code> e reinicie.</div>
   </div>
@@ -220,7 +225,7 @@
         <ul>
           <li>confere se Node, Git e Docker estão instalados;</li>
           <li>baixa o painel (HydraSmartFront);</li>
-          <li>cria o arquivo de configuração <code>.env</code>;</li>
+          <li>cria o <code>.env</code> e a <strong>chave do operador</strong>;</li>
           <li>instala as dependências;</li>
           <li>liga o banco de dados e cria as tabelas;</li>
           <li>gera o painel otimizado e roda os testes.</li>
@@ -229,13 +234,42 @@
       <div>
         <p style="margin-top:0">Estrutura final das pastas:</p>
         <pre class="arvore">C:\HydraSmart\
-├── HydraSmartAPI\    servidor, banco e
-│                     atalhos (.bat)
+├── HydraSmartAPI\    servidor, banco,
+│                     firmware e .bat
 └── HydraSmartFront\  painel</pre>
       </div>
     </div>
-    <div class="ok">No final deve aparecer <strong>"Instalação concluída!"</strong>.</div>
+    <div class="ok">No final deve aparecer <strong>"Instalação concluída!"</strong>, junto com a chave do operador.</div>
     <div class="nota">Se o Windows mostrar "O Windows protegeu o computador", clique em <strong>Mais informações → Executar assim mesmo</strong>.</div>
+  </div>
+</div>
+
+<!-- ======================== PROTÓTIPO ======================== -->
+<div class="secao">
+  <h2>O protótipo físico</h2>
+
+  <div class="passo">
+    <div class="passo-cab"><div class="num">4</div><h3>Preparar as réguas de eletrodos</h3><span class="tempo">~10 min</span></div>
+    <p>Cada bueiro tem uma <strong>régua com 6 contatos</strong> (pontas de jumper) em alturas diferentes. O nível é a fração de contatos que a água alcança: 3 de 6 = 50%.</p>
+    <table class="inteira">
+      <tr><th>Bueiro</th><th>Pinos do Arduino (contato de baixo → de cima)</th><th>Leitura</th></tr>
+      <tr><td><strong>B01</strong></td><td class="mono">A0 · A1 · A2 · A3 · A4 · A5</td><td>Analógica</td></tr>
+      <tr><td><strong>B02</strong></td><td class="mono">D7 · D6 · D5 · D4 · D3 · D2</td><td>Digital</td></tr>
+    </table>
+    <ul>
+      <li><strong>Fio de referência:</strong> em cada compartimento, um fio ligado ao <strong>GND do Arduino</strong> chegando ao fundo, abaixo do contato mais baixo. O ideal é um fio desencapado subindo ao longo de toda a régua.</li>
+      <li><strong>Água com sal:</strong> água de torneira com uma pitada de sal medida (cerca de ½ colher de chá por litro). Sem sal, o B02 só detecta o contato de baixo. Água destilada não funciona.</li>
+      <li><strong>Bombas:</strong> nunca ligue bombas ou baterias aos pinos do Arduino.</li>
+    </ul>
+    <div class="alerta">A água salgada corrói as pontas dos contatos. <strong>Troque a água ao fim de cada dia de uso.</strong></div>
+    <h3>Gravar o firmware (placa nova ou com outro programa)</h3>
+    <ol>
+      <li>Na <strong>Arduino IDE</strong> (<a href="https://www.arduino.cc/en/software">arduino.cc/en/software</a>), abra <code>HydraSmartAPI\firmware\hydrasmart_reguas\hydrasmart_reguas.ino</code>.</li>
+      <li>Em <strong>Ferramentas</strong>, escolha a placa <strong>Arduino Uno</strong> e a porta COM. Clique em <strong>Carregar</strong> (→).</li>
+      <li>Confira no <strong>Monitor Serial</strong> em 115200: devem aparecer linhas como <code>{"bueiro":1,"nivel_pct":50.0,...}</code>.</li>
+      <li><strong>Feche a IDE</strong> antes de iniciar o HydraSmart.</li>
+    </ol>
+    <div class="nota">Se a régua não detectar a água, grave <code>firmware\diagnostico_eletrodos</code>: ele mostra o valor de cada contato no Monitor Serial.</div>
   </div>
 </div>
 
@@ -244,46 +278,48 @@
   <h2>Uso no dia a dia</h2>
 
   <div class="passo">
-    <div class="passo-cab"><div class="num">4</div><h3>Ligar o sistema</h3><span class="tempo">~30 s</span></div>
+    <div class="passo-cab"><div class="num">5</div><h3>Ligar o sistema</h3><span class="tempo">~30 s</span></div>
     <ol>
-      <li>Ligue o <strong>Arduino</strong> no USB.</li>
-      <li>Feche a <strong>IDE do Arduino</strong>, se estiver aberta. Ela prende a porta USB.</li>
+      <li>Ligue o <strong>Arduino</strong> no USB, com a <strong>IDE do Arduino fechada</strong>.</li>
       <li>Dê <strong>dois cliques</strong> em <span class="arquivo">INICIAR-HYDRASMART.bat</span></li>
     </ol>
-    <p>Em cerca de 30 segundos:</p>
     <ul>
-      <li>abrem duas janelas, <strong>"HydraSmart API"</strong> e <strong>"HydraSmart Painel"</strong>. <strong>Não feche essas duas.</strong></li>
-      <li>o navegador abre sozinho em <strong>http://localhost:4173</strong>;</li>
-      <li>o servidor encontra o Arduino automaticamente e o indicador no menu lateral fica verde.</li>
+      <li>Abrem as janelas <strong>"HydraSmart API"</strong> e <strong>"HydraSmart Painel"</strong>. <strong>Não feche essas duas.</strong></li>
+      <li>O navegador abre em <strong>http://localhost:4173</strong>, e o servidor encontra o Arduino sozinho.</li>
+      <li>A janela do INICIAR mostra a <strong>chave do operador</strong>. Anote-a.</li>
     </ul>
-    <div class="nota">Na primeira vez, o Firewall do Windows pode pedir permissão para o <strong>Node.js</strong>. Marque <strong>Redes privadas</strong> e clique em <strong>Permitir</strong>. Isso é necessário para mostrar o painel em outro aparelho.</div>
-    <h3>Mostrar o painel numa TV, tablet ou celular</h3>
-    <p>A janela do INICIAR mostra um endereço como <code>http://192.168.0.15:4173</code>. Abra esse endereço em qualquer aparelho <strong>conectado à mesma rede Wi-Fi</strong>. Todos atualizam em tempo real ao mesmo tempo.</p>
+    <h3>Ver as leituras do protótipo</h3>
+    <p>O painel abre em <strong>"Análise com dados reais"</strong>. No menu lateral, clique no botão de modo (<strong>Trocar</strong>), escolha <strong>Projeto físico</strong>, digite a chave do operador e confirme. A faixa amarela <em>"MODO PROTÓTIPO EXPERIMENTAL"</em> indica leituras da bancada.</p>
+    <div class="nota">Na instalação local, <strong>quem lê a USB é o servidor</strong>. O cartão "Conexão USB do Arduino" do painel serve para quando a API está na nuvem; aqui ele daria erro de porta ocupada, então não precisa ser usado.</div>
+    <h3>Mostrar numa TV, tablet ou celular</h3>
+    <p>A janela do INICIAR mostra um endereço como <code>http://192.168.0.15:4173</code>. Abra-o em qualquer aparelho <strong>na mesma rede Wi-Fi</strong>. Na primeira vez, permita o <strong>Node.js</strong> no Firewall em <strong>Redes privadas</strong>.</p>
   </div>
 
   <div class="passo">
-    <div class="passo-cab"><div class="num">5</div><h3>Desligar</h3><span class="tempo">~5 s</span></div>
-    <p>Dê <strong>dois cliques</strong> em <span class="arquivo">PARAR-HYDRASMART.bat</span>. As leituras gravadas ficam salvas no banco.</p>
+    <div class="passo-cab"><div class="num">6</div><h3>Desligar</h3><span class="tempo">~5 s</span></div>
+    <p>Dê <strong>dois cliques</strong> em <span class="arquivo">PARAR-HYDRASMART.bat</span>. Os dados gravados ficam salvos no banco.</p>
   </div>
 
   <h2 style="margin-top:20px">Checklist do dia da feira</h2>
   <ul class="check">
     <li>Notebook carregado e na tomada. <strong>Desative a suspensão</strong> em <em>Configurações → Sistema → Energia</em>.</li>
-    <li>Abrir o Docker Desktop e esperar "Engine running". Se a opção de iniciar com o Windows estiver marcada, ele abre sozinho.</li>
-    <li>Plugar o Arduino, com a IDE do Arduino fechada.</li>
-    <li>Dois cliques em <strong>INICIAR-HYDRASMART.bat</strong>.</li>
-    <li>Abrir a página <strong>Diagnóstico</strong> e conferir o autodiagnóstico: API, tempo real, banco e Arduino devem estar com ✔.</li>
-    <li>Testar o som (Diagnóstico → <strong>Testar sirene</strong>). O navegador só libera som depois do primeiro clique na página.</li>
+    <li>Docker Desktop aberto, com "Engine running".</li>
+    <li>Água nova com sal nos compartimentos e réguas no lugar.</li>
+    <li>Arduino plugado, com a IDE do Arduino fechada.</li>
+    <li>Dois cliques em <strong>INICIAR-HYDRASMART.bat</strong> e anotar a <strong>chave do operador</strong>.</li>
+    <li>No painel, trocar para <strong>Projeto físico</strong> e conferir B01 e B02 mudando quando a água sobe e desce.</li>
+    <li>Abrir <strong>Diagnóstico</strong> e conferir a "Saúde do monitoramento" e os níveis por bueiro.</li>
+    <li>Se for mostrar os avisos no celular, tocar em <strong>Ativar avisos</strong> no aparelho.</li>
   </ul>
-  <div class="alerta"><strong>Plano B:</strong> se o Arduino falhar, clique em <strong>Modo Real → Trocar</strong> no menu lateral. O modo demonstração simula cenários de chuva e alagamento sem gravar nada no histórico.</div>
+  <div class="alerta"><strong>Plano B:</strong> se o Arduino falhar, vá em <strong>Bueiros e sensores → Iniciar simulação de teste</strong>. A simulação gera níveis sintéticos e não grava nada no histórico.</div>
 
   <h3 style="break-after:avoid">Sem internet no local?</h3>
   <table class="inteira">
     <tr><th style="width:50%">Funciona sem internet</th><th>Precisa de internet</th></tr>
-    <tr><td><span class="sim">✔</span> Leitura do Arduino, níveis e alertas</td><td><span class="nao">✖</span> Mapa (imagens do OpenStreetMap)</td></tr>
-    <tr><td><span class="sim">✔</span> Banco de dados, histórico e relatórios</td><td><span class="nao">✖</span> Clima (Open-Meteo)</td></tr>
-    <tr><td><span class="sim">✔</span> Gráficos</td><td><span class="nao">✖</span> CEMADEN</td></tr>
-    <tr><td><span class="sim">✔</span> Modo demonstração</td><td><span class="nao">✖</span> Fontes do texto (o painel usa uma fonte padrão do Windows no lugar)</td></tr>
+    <tr><td><span class="sim">✔</span> Leitura das réguas, níveis e alertas</td><td><span class="nao">✖</span> Mapa e bocas de lobo da Prefeitura</td></tr>
+    <tr><td><span class="sim">✔</span> Banco de dados e histórico</td><td><span class="nao">✖</span> Clima (Open-Meteo)</td></tr>
+    <tr><td><span class="sim">✔</span> Gráficos e diagnóstico</td><td><span class="nao">✖</span> Defesa Civil RS e CEMADEN</td></tr>
+    <tr><td><span class="sim">✔</span> Simulação de teste</td><td><span class="nao">✖</span> Análise com IA e fontes do texto</td></tr>
   </table>
   <div class="nota">Dica: o roteador do celular resolve. Ligue o notebook nele antes de iniciar o sistema.</div>
 </div>
@@ -294,36 +330,7 @@
   <p>Com o sistema desligado, abra o terminal em <code>C:\HydraSmart</code> e rode:</p>
   <pre>cd HydraSmartAPI;   git pull;   cd ..
 cd HydraSmartFront; git pull;   cd ..</pre>
-  <p>Depois rode <strong>INSTALAR-HYDRASMART.bat</strong> de novo. Ele mantém o <code>.env</code> e os dados do banco.</p>
-
-  <div style="break-inside:avoid"><h2 style="margin-top:20px">Gravar o firmware no Arduino (só se for uma placa nova)</h2>
-  <ol>
-    <li>Instale a <strong>Arduino IDE</strong>: <a href="https://www.arduino.cc/en/software">arduino.cc/en/software</a></li>
-    <li>Abra <code>HydraSmartAPI\firmware\hydrasmart_firmware.ino</code>.</li>
-    <li>Em <strong>Ferramentas → Placa</strong>, escolha <strong>Arduino Uno</strong>. Em <strong>Ferramentas → Porta</strong>, escolha a porta COM do Arduino.</li>
-    <li>Clique em <strong>Carregar</strong> (seta →).</li>
-    <li><strong>Feche a IDE</strong> antes de iniciar o HydraSmart.</li>
-  </ol>
-  <table class="inteira">
-    <tr><th>Sensor HC-SR04</th><th>TRIG</th><th>ECHO</th><th>Alimentação</th></tr>
-    <tr><td>Bueiro 01 (entrada)</td><td class="mono">D9</td><td class="mono">D10</td><td rowspan="2" style="vertical-align:middle">VCC → 5V &nbsp;•&nbsp; GND → GND</td></tr>
-    <tr><td>Bueiro 02 (saída)</td><td class="mono">D6</td><td class="mono">D7</td></tr>
-  </table>
-
-  </div>
-
-  <h2 style="margin-top:20px">Problemas comuns</h2>
-  <table>
-    <tr><th style="width:32%">Sintoma</th><th>Solução</th></tr>
-    <tr><td>"Node.js não encontrado" logo após instalar</td><td>Feche e abra a janela de novo, ou reinicie o computador.</td></tr>
-    <tr><td>Docker Desktop não abre ou fica em "Starting"</td><td>Confira a virtualização na BIOS. Rode <code>wsl --update</code> no PowerShell como administrador e reinicie.</td></tr>
-    <tr><td>"Porta ocupada" ao iniciar o banco</td><td>Outro programa usa a porta 5433. No arquivo <code>.env</code>, troque <code>DB_PORT=5434</code> e a porta em <code>DATABASE_URL</code> para 5434.</td></tr>
-    <tr><td>Arduino não é encontrado</td><td>Feche a IDE do Arduino. Troque o cabo (alguns só carregam e não transmitem dados). Instale o driver CH340. Com mais de uma placa, defina <code>SERIAL_PORT=COM4</code> (a porta certa) no <code>.env</code>.</td></tr>
-    <tr><td>Bueiros "Desatualizado"</td><td>O Arduino parou de enviar dados. Confira o cabo. A API reconecta sozinha a cada 5 segundos.</td></tr>
-    <tr><td>Painel mostra "Servidor indisponível"</td><td>A janela "HydraSmart API" foi fechada ou mostra um erro. Rode PARAR e depois INICIAR.</td></tr>
-    <tr><td>Outro aparelho não abre o painel</td><td>Os dois precisam estar no mesmo Wi-Fi, e o Firewall precisa permitir o Node.js em "Redes privadas".</td></tr>
-    <tr><td>Banco aparece como "memória" no Diagnóstico</td><td>O Docker não estava ligado quando a API subiu, e os dados não serão salvos. Abra o Docker, rode PARAR e depois INICIAR.</td></tr>
-  </table>
+  <p>Depois rode <strong>INSTALAR-HYDRASMART.bat</strong> de novo. Ele mantém o <code>.env</code> e os dados do banco. Se o firmware mudou, grave-o de novo (passo 4).</p>
 
   <h3>Endereços úteis</h3>
   <table class="inteira">
@@ -332,6 +339,24 @@ cd HydraSmartFront; git pull;   cd ..</pre>
     <tr><td class="mono">http://localhost:3333/docs</td><td>Documentação técnica da API (Swagger)</td></tr>
     <tr><td class="mono">http://localhost:3333/api/v1/health</td><td>Verificação rápida de saúde da API</td></tr>
   </table>
+
+  <h2 style="margin-top:20px">Problemas comuns</h2>
+  <table class="compacta">
+    <tr><th style="width:32%">Sintoma</th><th>Solução</th></tr>
+    <tr><td>"Node.js não encontrado" logo após instalar</td><td>Feche e abra a janela de novo, ou reinicie o computador.</td></tr>
+    <tr><td>Docker não abre ou fica em "Starting"</td><td>Confira a virtualização na BIOS. Rode <code>wsl --update</code> como administrador e reinicie.</td></tr>
+    <tr><td>"Porta ocupada" ao iniciar o banco</td><td>No <code>.env</code>, troque <code>DB_PORT=5434</code> e a porta em <code>DATABASE_URL</code> para 5434.</td></tr>
+    <tr><td>Arduino não é encontrado</td><td>Feche a IDE do Arduino. Troque o cabo (alguns só carregam). Instale o driver CH340. Com mais de uma placa, defina <code>SERIAL_PORT=COM4</code> no <code>.env</code>.</td></tr>
+    <tr><td>Nível sempre em 0%</td><td>Confira se o firmware <code>hydrasmart_reguas</code> está gravado (Monitor Serial em 115200) e se o fio de GND está na água.</td></tr>
+    <tr><td>B02 só detecta o contato de baixo</td><td>Falta sal na água, ou o fio de GND não sobe ao longo da régua.</td></tr>
+    <tr><td>"CONTATOS_INCONSISTENTES"</td><td>Confira a ordem dos fios (B02: D7 embaixo, D2 em cima) e se algum jumper encosta no GND fora da água.</td></tr>
+    <tr><td>"Chave de operador necessária" ou "inválida"</td><td>Use a chave da janela do INICIAR, ou a linha <code>OPERATOR_API_KEY</code> do arquivo <code>HydraSmartAPI\.env</code>.</td></tr>
+    <tr><td>"Operações administrativas desabilitadas"</td><td>Rode PARAR e depois INICIAR: o INICIAR cria a chave sozinho.</td></tr>
+    <tr><td>Painel mostra "Servidor indisponível"</td><td>A janela "HydraSmart API" foi fechada ou mostra erro. Rode PARAR e depois INICIAR.</td></tr>
+    <tr><td>Outro aparelho não abre o painel</td><td>Mesmo Wi-Fi nos dois, e o Firewall permitindo o Node.js em "Redes privadas".</td></tr>
+    <tr><td>Banco aparece como "memória"</td><td>O Docker não estava ligado quando a API subiu. Abra o Docker, rode PARAR e depois INICIAR.</td></tr>
+  </table>
+
 </div>
 
 </body>
