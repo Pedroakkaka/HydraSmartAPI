@@ -62,6 +62,67 @@ export default async function rotasPush(app, { ctx }) {
     return { tipo:'simulacao', naoEmergencia:true, ...(await ctx.webPush.enviarTeste()) };
   });
 
+  // O próprio SW confirma o processamento por token aleatório; nenhuma chave
+  // administrativa é enviada ao navegador e nenhuma identidade é exposta.
+  app.post('/push/confirmar', {schema:{body:{
+    type:'object',additionalProperties:false,required:['token'],
+    properties:{token:{type:'string',pattern:'^[a-f0-9]{32} {schema:{body:esquema}}, async (req, reply) => {
+    if (!configuracaoPushValida(ctx.config) || !ctx.webPush?.ativo) {
+      return reply.code(503).send({erro:'Web Push indisponível no servidor'});
+    }
+    if (!validarInscricao(req.body)) return reply.code(400).send({erro:'Inscrição Push inválida'});
+    await ctx.repositorios.pushInscricoes.salvar(req.body);
+    return reply.code(201).send({inscrito:true, escopo:'somente_simulacao'});
+  });
+
+  app.post('/push/cancelar', {schema:{
+    body:{type:'object',additionalProperties:false,required:['endpoint'],
+      properties:{endpoint:{type:'string',maxLength:2048}}}
+  }}, async (req, reply) => {
+    const endpoint = req.body.endpoint;
+    if (typeof endpoint !== 'string' || !/^https:\/\//.test(endpoint)) {
+      return reply.code(400).send({erro:'Inscrição inválida'});
+    }
+    await ctx.repositorios.pushInscricoes.remover(endpoint);
+    return {inscrito:false};
+  });
+}
+}}
+  }}}, async req => ({
+    confirmado: Boolean(ctx.webPush?.confirmarRecebimento(req.body.token))
+  }));
+
+  // Consulta temporária apenas para o operador autorizado.
+  app.post('/push/resultado', {schema:{body:{
+    type:'object',additionalProperties:false,required:['testeId'],
+    properties:{testeId:{type:'string',pattern:'^[a-f0-9]{32} {schema:{body:esquema}}, async (req, reply) => {
+    if (!configuracaoPushValida(ctx.config) || !ctx.webPush?.ativo) {
+      return reply.code(503).send({erro:'Web Push indisponível no servidor'});
+    }
+    if (!validarInscricao(req.body)) return reply.code(400).send({erro:'Inscrição Push inválida'});
+    await ctx.repositorios.pushInscricoes.salvar(req.body);
+    return reply.code(201).send({inscrito:true, escopo:'somente_simulacao'});
+  });
+
+  app.post('/push/cancelar', {schema:{
+    body:{type:'object',additionalProperties:false,required:['endpoint'],
+      properties:{endpoint:{type:'string',maxLength:2048}}}
+  }}, async (req, reply) => {
+    const endpoint = req.body.endpoint;
+    if (typeof endpoint !== 'string' || !/^https:\/\//.test(endpoint)) {
+      return reply.code(400).send({erro:'Inscrição inválida'});
+    }
+    await ctx.repositorios.pushInscricoes.remover(endpoint);
+    return {inscrito:false};
+  });
+}
+}}
+  }}}, async (req, reply) => {
+    const resumo = ctx.webPush?.consultarRecibo(req.body.testeId);
+    if (!resumo) return reply.code(404).send({erro:'Teste expirado ou inexistente'});
+    return resumo;
+  });
+
   app.post('/push/inscrever', {schema:{body:esquema}}, async (req, reply) => {
     if (!configuracaoPushValida(ctx.config) || !ctx.webPush?.ativo) {
       return reply.code(503).send({erro:'Web Push indisponível no servidor'});
