@@ -50,19 +50,19 @@ export default async function rotasPush(app, { ctx }) {
     if (atual.tentativas > 15) return reply.code(429).send({erro:'Tente novamente mais tarde'});
   });
 
-  app.get('/publica', async () => ({
+  app.get('/push/publica', async () => ({
     disponivel: Boolean(ctx.webPush?.ativo),
     chavePublica: ctx.webPush?.ativo ? ctx.config.vapidPublicKey : null
   }));
 
   // Restrita à chave do operador (via hook global): testa envio REMOTO a todos
   // os dispositivos inscritos sem depender do nível atual do Arduino.
-  app.post('/testar', async (req, reply) => {
+  app.post('/push/testar', async (req, reply) => {
     if (!ctx.webPush?.ativo) return reply.code(503).send({ erro:'Web Push indisponível no servidor' });
     return { tipo:'simulacao', naoEmergencia:true, ...(await ctx.webPush.enviarTeste()) };
   });
 
-  app.post('/inscrever', {schema:{body:esquema}}, async (req, reply) => {
+  app.post('/push/inscrever', {schema:{body:esquema}}, async (req, reply) => {
     if (!configuracaoPushValida(ctx.config) || !ctx.webPush?.ativo) {
       return reply.code(503).send({erro:'Web Push indisponível no servidor'});
     }
@@ -71,7 +71,7 @@ export default async function rotasPush(app, { ctx }) {
     return reply.code(201).send({inscrito:true, escopo:'somente_simulacao'});
   });
 
-  app.post('/cancelar', {schema:{
+  app.post('/push/cancelar', {schema:{
     body:{type:'object',additionalProperties:false,required:['endpoint'],
       properties:{endpoint:{type:'string',maxLength:2048}}}
   }}, async (req, reply) => {
