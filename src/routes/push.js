@@ -55,6 +55,13 @@ export default async function rotasPush(app, { ctx }) {
     chavePublica: ctx.webPush?.ativo ? ctx.config.vapidPublicKey : null
   }));
 
+  // Restrita à chave do operador (via hook global): testa envio REMOTO a todos
+  // os dispositivos inscritos sem depender do nível atual do Arduino.
+  app.post('/testar', async (req, reply) => {
+    if (!ctx.webPush?.ativo) return reply.code(503).send({ erro:'Web Push indisponível no servidor' });
+    return { tipo:'simulacao', naoEmergencia:true, ...(await ctx.webPush.enviarTeste()) };
+  });
+
   app.post('/inscrever', {schema:{body:esquema}}, async (req, reply) => {
     if (!configuracaoPushValida(ctx.config) || !ctx.webPush?.ativo) {
       return reply.code(503).send({erro:'Web Push indisponível no servidor'});
