@@ -119,6 +119,38 @@ export async function enviarPush(inscricao, mensagem, config, fetchImpl = fetch)
 export function criarWebPush({ config, repositorio, alertas, log }) {
   const ativo = configuracaoPushValida(config) && Boolean(repositorio);
   const fila = new Set();
+  // Recibos do Service Worker: prova processamento, não leitura humana.
+  const recibos = new Map();
+  const TTL_RECIBO = 10 * 60 * 1000;
+  const limparRecibos = () => {
+    for (const [id, item] of recibos) {
+      if (Date.now() - item.criadoEm > TTL_RECIBO) recibos.delete(id);
+    }
+  };
+  const confirmarRecebimento = token => {
+    if (typeof token !== 'string' || !/^[a-f0-9]{32}$/.test(token)) return false;
+    limparRecibos();
+    for (const item of recibos.values()) {
+      if (item.tokens.has(token)) {
+        item.confirmados.add(token);
+        return true;
+      }
+    }
+    return false;
+  };
+  const consultarRecibo = id => {
+    limparRecibos();
+    const item = recibos.get(id);
+    if (!item) return null;
+    return {
+      inscritos: item.inscritos,
+      aceitosGateway: item.aceitosGateway,
+      recusadosGateway: item.recusadosGateway,
+      erros: item.erros,
+      confirmadosCelulares: item.confirmados.size,
+      atualizadoEm: item.criadoEm
+    };
+  };
   const avisar = async evento => {
     const a = evento?.alerta;
     if (!ativo || !a?.simulado ||
@@ -138,13 +170,23 @@ export function criarWebPush({ config, repositorio, alertas, log }) {
       id: String(a.id ?? Date.now()), url: '/diagnostico'
     };
     const inscricoes = await repositorio.listar();
-    const resultado = { inscritos: inscricoes.length, aceitosGateway: 0, recusadosGateway: 0, erros: 0 };
+    limparRecibos();
+    const testeId = randomBytes(16).toString('hex');
+    const recibo = {
+      criadoEm: Date.now(), inscritos: inscricoes.length,
+      aceitosGateway: 0, recusadosGateway: 0, erros: 0,
+      tokens: new Set(), confirmados: new Set()
+    };
+    recibos.set(testeId, recibo);
+    const resultado = { inscritos: inscricoes.length, aceitosGateway: 0, recusadosGateway: 0, erros: 0, testeId };
     await Promise.allSettled(inscricoes.map(async inscricao => {
       const chave = inscricao.endpoint + ':' + mensagem.id;
       if (fila.has(chave)) return;
       fila.add(chave);
       try {
-        const status = await enviarPush(inscricao, mensagem, config);
+        const reciboToken = randomBytes(16).toString('hex');
+        recibo.tokens.add(reciboToken);
+        const status = await enviarPush(inscricao, { ...mensagem, reciboToken }, config);
         if (status === 404 || status === 410) {
           resultado.recusadosGateway++;
           await repositorio.remover(inscricao.endpoint);
@@ -161,7 +203,17 @@ export function criarWebPush({ config, repositorio, alertas, log }) {
         fila.delete(chave);
       }
     }));
-    return resultado;
+    Object.assign(recibo, {
+      aceitosGateway: resultado.aceitosGateway,
+      recusadosGateway: resultado.recusadosGateway,
+      erros: resultado.erros
+    });
+    log?.info?.({
+      inscritos: resultado.inscritos, aceitosGateway: resultado.aceitosGateway,
+      recusadosGateway: resultado.recusadosGateway, erros: resultado.erros,
+      confirmadosCelulares: recibo.confirmados.size
+    }, '[push] resumo de envio experimental');
+    return { ...resultado, confirmadosCelulares: recibo.confirmados.size };
   };
   const enviarTeste = () => avisar({
     acao:'nivel_alto_teste',
@@ -175,5 +227,5 @@ export function criarWebPush({ config, repositorio, alertas, log }) {
   });
   const aoAlerta = evento => { void avisar(evento).catch(err => log?.warn?.({ err }, '[push] erro')); };
   if (ativo) alertas.on('alerta', aoAlerta);
-  return { ativo, enviarTeste, encerrar: () => alertas.off('alerta', aoAlerta) };
+  return { ativo, enviarTeste, confirmarRecebimento, consultarRecibo, encerrar: () => alertas.off('alerta', aoAlerta) };
 }
