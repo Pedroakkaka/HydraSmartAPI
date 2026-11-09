@@ -14,7 +14,7 @@ export class AlertService extends EventEmitter {
     this.repo = repositorios.alertas;
     this.log = log;
     this.abertos = new Map(); // chave "bueiro_1:real" -> alerta
-    this.faixasTestePrototipo = new Map(); // um aviso ao entrar em atenção, rearmado ao normalizar
+    this.faixasTestePrototipo = new Map(); // faixas independentes por canal e bueiro
   }
 
   async inicializar() {
@@ -33,24 +33,26 @@ export class AlertService extends EventEmitter {
     // Notificação didática: ao atingir a faixa de ATENÇÃO pela primeira vez,
     // emitir um evento do protótipo. Leituras seguintes na mesma faixa não repetem.
     // Nenhum SMS, push externo ou aviso oficial é emitido aqui.
-    if (canal === 'prototipo' && simulado === true) {
-      const anterior = this.faixasTestePrototipo.get(bueiroId) || 'normal';
+    if ((canal === 'prototipo' || canal === 'demonstracao') && simulado === true) {
+      const identificador = canal + ':' + bueiroId;
+      const prefixo = canal === 'demonstracao' ? 'SIMULAÇÃO' : 'PROTÓTIPO';
+      const anterior = this.faixasTestePrototipo.get(identificador) || 'normal';
       if (risco === 'normal' || risco === 'desconhecido') {
-        this.faixasTestePrototipo.set(bueiroId, risco);
+        this.faixasTestePrototipo.set(identificador, risco);
       } else if (risco === 'atencao' && anterior !== 'atencao' && anterior !== 'critico') {
-        this.faixasTestePrototipo.set(bueiroId, 'atencao');
+        this.faixasTestePrototipo.set(identificador, 'atencao');
         this.emit('alerta', {
           acao: 'nivel_alto_teste',
           alerta: {
-            id: 'atencao-prototipo-' + bueiroId + '-' + Date.now(),
-            bueiroId, simulado: true, canal: 'prototipo',
+            id: 'atencao-' + canal + '-' + bueiroId + '-' + Date.now(),
+            bueiroId, simulado: true, canal,
             nivelPctPico: nivelPct,
-            mensagem: '[TESTE PROTÓTIPO] Nível alto de bancada no ' + nomeBueiro
+            mensagem: '[TESTE ' + prefixo + '] Nível alto experimental no ' + nomeBueiro
               + ' (' + nivelPct.toFixed(1) + '%). TESTE DO SISTEMA — NÃO É EMERGÊNCIA. Nenhuma ação necessária.'
           }
         });
       } else {
-        this.faixasTestePrototipo.set(bueiroId, risco);
+        this.faixasTestePrototipo.set(identificador, risco);
       }
     }
 

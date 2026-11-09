@@ -194,7 +194,32 @@ export function criarRepositoriosPostgres(pool) {
     }
   };
 
+  const pushInscricoes = {
+    async salvar(inscricao) {
+      const { rowCount } = await pool.query(
+        'SELECT endpoint FROM push_inscricoes WHERE endpoint = $1', [inscricao.endpoint]
+      );
+      if (!rowCount) {
+        const { rows } = await pool.query('SELECT COUNT(*)::int AS total FROM push_inscricoes');
+        if (rows[0].total >= 500) throw new Error('Limite de dispositivos inscritos atingido');
+      }
+      await pool.query(
+        `INSERT INTO push_inscricoes (endpoint,p256dh,auth) VALUES ($1,$2,$3)
+         ON CONFLICT (endpoint) DO UPDATE SET p256dh=$2, auth=$3, atualizado_em=now()`,
+        [inscricao.endpoint, inscricao.keys.p256dh, inscricao.keys.auth]
+      );
+    },
+    async listar() {
+      const { rows } = await pool.query('SELECT endpoint,p256dh,auth FROM push_inscricoes');
+      return rows.map(r => ({ endpoint:r.endpoint, keys:{ p256dh:r.p256dh, auth:r.auth } }));
+    },
+    async remover(endpoint) {
+      await pool.query('DELETE FROM push_inscricoes WHERE endpoint=$1', [endpoint]);
+    }
+  };
+
   return {
+    pushInscricoes,
     tipo: 'postgres',
     bueiros,
     leituras,

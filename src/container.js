@@ -16,6 +16,7 @@ import { ReportService } from './services/reportService.js';
 import { SerialReader } from './serial/serialReader.js';
 import { sanitizarParametros, normalizarBueiroId } from './core/calibration.js';
 import { DataValidator } from './core/validator.js';
+import { criarWebPush } from './services/webPush.js';
 
 export async function criarContexto({ config, repositorios, log }) {
   const calibracoes = await repositorios.bueiros.listar();
@@ -29,6 +30,7 @@ export async function criarContexto({ config, repositorios, log }) {
   const alertas = new AlertService({ repositorios, log });
   await alertas.inicializar();
   const simuladorDefesaCivil = new SimuladorDefesaCivil({ alertas });
+  const webPush = criarWebPush({ config, repositorio: repositorios.pushInscricoes, alertas, log });
 
   const ingest = new IngestService({ estado, repositorios, alertas, log });
   const simulador = new Simulator({ estado, ingest, alertas, log });
@@ -89,6 +91,7 @@ export async function criarContexto({ config, repositorios, log }) {
     estado,
     alertas,
     simuladorDefesaCivil,
+    webPush,
     ingest,
     simulador,
     serial,
@@ -107,6 +110,7 @@ export async function criarContexto({ config, repositorios, log }) {
       clearInterval(timerLiveness);
       simulador.parar();
       simuladorDefesaCivil.encerrar();
+      webPush.encerrar();
       await serial.encerrar();
       await repositorios.fechar();
     }

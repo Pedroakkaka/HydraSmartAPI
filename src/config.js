@@ -42,6 +42,10 @@ export function carregarConfig(env = process.env) {
     operatorApiKey: (env.OPERATOR_API_KEY || '').trim(),
     // Exclusiva da ponte USB local para o canal experimental. Nunca enviar ao navegador.
     prototypeIngestApiKey: env.PROTOTYPE_INGEST_API_KEY || '',
+    // Credenciais VAPID de Web Push, somente no servidor (nunca expor chave privada).
+    vapidPublicKey: env.VAPID_PUBLIC_KEY || '',
+    vapidPrivateKey: env.VAPID_PRIVATE_KEY || '',
+    vapidSubject: env.VAPID_SUBJECT || '',
     // Cloudflare Workers AI: credenciais apenas no backend.
     cloudflareAccountId: env.CLOUDFLARE_ACCOUNT_ID || '',
     cloudflareApiToken: env.CLOUDFLARE_API_TOKEN || '',
