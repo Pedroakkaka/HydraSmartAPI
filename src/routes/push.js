@@ -33,7 +33,9 @@ export default async function rotasPush(app, { ctx }) {
     } catch { return false; }
   };
   app.addHook('onRequest', async (req, reply) => {
-    if (req.method !== 'POST' || !['/inscrever', '/cancelar'].includes(req.url.split('?')[0])) return;
+    const caminho = req.url.split('?')[0];
+    if (req.method !== 'POST' ||
+        (!caminho.endsWith('/push/inscrever') && !caminho.endsWith('/push/cancelar'))) return;
     if (!origemAceita(req)) return reply.code(403).send({ erro:'Origem não autorizada' });
     const agora = Date.now();
     const anterior = contagem.get(req.ip);
