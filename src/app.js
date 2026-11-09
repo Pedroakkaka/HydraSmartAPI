@@ -19,6 +19,7 @@ import rotasRelatorios from './routes/relatorios.js';
 import rotasIA from './routes/ia.js';
 import rotasBrasil from './routes/brasil.js';
 import rotasDrenagemNacional from './routes/drenagemNacional.js';
+import rotasPush from './routes/push.js';
 
 /**
  * @param {object} ctx Contexto criado por criarContexto()
@@ -80,7 +81,8 @@ export async function construirApp(ctx, { logger = false } = {}) {
     const path = req.url.split('?')[0];
     const isMutation = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method);
     const isIngest = req.method === 'POST' && (path === '/api/v1/leituras' || path === '/api/v1/leituras/prototipo');
-    if (!isMutation || isIngest || !path.startsWith('/api/v1/')) return;
+    const isPushOptin = req.method === 'POST' && (path === '/api/v1/push/inscrever' || path === '/api/v1/push/cancelar');
+    if (!isMutation || isIngest || isPushOptin || !path.startsWith('/api/v1/')) return;
     if (!operatorKey) return reply.code(503).send({ erro: 'Operações administrativas desabilitadas: configure OPERATOR_API_KEY no backend.' });
     if (!chaveConfere(req.headers['x-operator-key'])) {
       return reply.code(401).send({ erro: 'Chave de operador necessária.' });
@@ -111,7 +113,7 @@ export async function construirApp(ctx, { logger = false } = {}) {
   await registrarWebSocket(app, ctx);
 
   await app.register(async (api) => {
-    for (const rotas of [rotasSistema, rotasBueiros, rotasLeituras, rotasOperacao, rotasExternas, rotasRelatorios, rotasIA, rotasBrasil, rotasDrenagemNacional]) {
+    for (const rotas of [rotasSistema, rotasBueiros, rotasLeituras, rotasOperacao, rotasExternas, rotasRelatorios, rotasIA, rotasBrasil, rotasDrenagemNacional, rotasPush]) {
       await api.register(rotas, { ctx });
     }
   }, { prefix: '/api/v1' });
