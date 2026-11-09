@@ -138,22 +138,42 @@ export function criarWebPush({ config, repositorio, alertas, log }) {
       id: String(a.id ?? Date.now()), url: '/diagnostico'
     };
     const inscricoes = await repositorio.listar();
+    const resultado = { inscritos: inscricoes.length, aceitosGateway: 0, recusadosGateway: 0, erros: 0 };
     await Promise.allSettled(inscricoes.map(async inscricao => {
       const chave = inscricao.endpoint + ':' + mensagem.id;
       if (fila.has(chave)) return;
       fila.add(chave);
       try {
         const status = await enviarPush(inscricao, mensagem, config);
-        if (status === 404 || status === 410) await repositorio.remover(inscricao.endpoint);
-        else if (status < 200 || status >= 300) log?.warn?.({ status }, '[push] gateway recusou notificação de teste');
+        if (status === 404 || status === 410) {
+          resultado.recusadosGateway++;
+          await repositorio.remover(inscricao.endpoint);
+        } else if (status >= 200 && status < 300) {
+          resultado.aceitosGateway++;
+        } else {
+          resultado.recusadosGateway++;
+          log?.warn?.({ status }, '[push] gateway recusou notificação de teste');
+        }
       } catch (err) {
+        resultado.erros++;
         log?.warn?.({ motivo: err.message }, '[push] falha de entrega de teste');
       } finally {
         fila.delete(chave);
       }
     }));
+    return resultado;
   };
+  const enviarTeste = () => avisar({
+    acao:'nivel_alto_teste',
+    alerta:{
+      id:'teste-remoto-' + Date.now(),
+      bueiroId:'bueiro_1',
+      nivelPctPico:83.3,
+      simulado:true,
+      mensagem:'[TESTE SIMULAÇÃO] Envio remoto voluntário. NÃO É EMERGÊNCIA.'
+    }
+  });
   const aoAlerta = evento => { void avisar(evento).catch(err => log?.warn?.({ err }, '[push] erro')); };
   if (ativo) alertas.on('alerta', aoAlerta);
-  return { ativo, encerrar: () => alertas.off('alerta', aoAlerta) };
+  return { ativo, enviarTeste, encerrar: () => alertas.off('alerta', aoAlerta) };
 }
