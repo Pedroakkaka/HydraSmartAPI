@@ -4,6 +4,7 @@ const esquema = {
   type:'object', additionalProperties:false, required:['endpoint','keys'],
   properties: {
     endpoint:{ type:'string', maxLength:2048 },
+    expirationTime:{type:['number','null']},
     keys:{
       type:'object', additionalProperties:false, required:['p256dh','auth'],
       properties:{
