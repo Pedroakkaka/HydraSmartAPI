@@ -55,11 +55,27 @@ export default async function rotasPush(app, { ctx }) {
     chavePublica: ctx.webPush?.ativo ? ctx.config.vapidPublicKey : null
   }));
 
-  // Restrita à chave do operador (via hook global): testa envio REMOTO a todos
-  // os dispositivos inscritos sem depender do nível atual do Arduino.
+  // Diagnóstico técnico protegido pela chave do operador; não aparece ao público.
   app.post('/push/testar', async (req, reply) => {
     if (!ctx.webPush?.ativo) return reply.code(503).send({ erro:'Web Push indisponível no servidor' });
     return { tipo:'simulacao', naoEmergencia:true, ...(await ctx.webPush.enviarTeste()) };
+  });
+
+  // Recibo gerado pelo Service Worker para cada notificação processada.
+  app.post('/push/confirmar', {schema:{body:{
+    type:'object',additionalProperties:false,required:['token'],
+    properties:{token:{type:'string',pattern:'^[a-f0-9]{32}$'}}
+  }}}, async req => ({
+    confirmado: Boolean(ctx.webPush?.confirmarRecebimento(req.body.token))
+  }));
+
+  app.post('/push/resultado', {schema:{body:{
+    type:'object',additionalProperties:false,required:['testeId'],
+    properties:{testeId:{type:'string',pattern:'^[a-f0-9]{32}$'}}
+  }}}, async (req, reply) => {
+    const resumo = ctx.webPush?.consultarRecibo(req.body.testeId);
+    if (!resumo) return reply.code(404).send({erro:'Teste expirado ou inexistente'});
+    return resumo;
   });
 
   app.post('/push/inscrever', {schema:{body:esquema}}, async (req, reply) => {
