@@ -151,7 +151,20 @@ export function criarRepositoriosMemoria() {
     }
   };
 
+  const tabelaPush = new Map();
+  const pushInscricoes = {
+    async salvar(inscricao) {
+      if (!tabelaPush.has(inscricao.endpoint) && tabelaPush.size >= 500) {
+        throw new Error('Limite de dispositivos inscritos atingido');
+      }
+      tabelaPush.set(inscricao.endpoint, clonar(inscricao));
+    },
+    async listar() { return clonar([...tabelaPush.values()]); },
+    async remover(endpoint) { tabelaPush.delete(endpoint); }
+  };
+
   return {
+    pushInscricoes,
     tipo: 'memoria',
     bueiros,
     leituras,
