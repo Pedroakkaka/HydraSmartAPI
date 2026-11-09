@@ -25,7 +25,11 @@ export default async function rotasPush(app, { ctx }) {
       const url = new URL(origem);
       const autorizadas = ctx.config.corsOrigin;
       const localhost = /^https?:\/\/localhost(:\d+)?$/.test(url.origin) && !ctx.config.producao;
-      return localhost || autorizadas.includes(url.origin);
+      const dominiosOficiais = [
+        'https://hydrasmart-monitor.vercel.app',
+        'https://hydra-smart-front.vercel.app'
+      ];
+      return localhost || autorizadas.includes(url.origin) || dominiosOficiais.includes(url.origin);
     } catch { return false; }
   };
   app.addHook('onRequest', async (req, reply) => {
