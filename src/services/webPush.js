@@ -179,7 +179,11 @@ export function criarWebPush({ config, repositorio, alertas, log }) {
     };
     recibos.set(testeId, recibo);
     const resultado = { inscritos: inscricoes.length, aceitosGateway: 0, recusadosGateway: 0, erros: 0, testeId };
-    await Promise.allSettled(inscricoes.map(async inscricao => {
+    // Evita criar centenas de conexões simultâneas ao FCM/APNs quando
+    // muitos aparelhos se inscrevem. Não envia dados operacionais.
+    const LOTE_PUSH = 8;
+    for (let inicio = 0; inicio < inscricoes.length; inicio += LOTE_PUSH) {
+      await Promise.allSettled(inscricoes.slice(inicio, inicio + LOTE_PUSH).map(async inscricao => {
       const chave = inscricao.endpoint + ':' + mensagem.id;
       if (fila.has(chave)) return;
       fila.add(chave);
@@ -202,7 +206,8 @@ export function criarWebPush({ config, repositorio, alertas, log }) {
       } finally {
         fila.delete(chave);
       }
-    }));
+      }));
+    }
     Object.assign(recibo, {
       aceitosGateway: resultado.aceitosGateway,
       recusadosGateway: resultado.recusadosGateway,
