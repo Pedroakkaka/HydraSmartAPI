@@ -48,6 +48,7 @@ export class Simulator {
     this.timer = null;
     this.cenario = CENARIOS[1];
     this.fatorRampa = 1;
+    this.cicloEmAndamento = false;
   }
 
   obterCenario(id) {
@@ -121,13 +122,21 @@ export class Simulator {
   }
 
   async _ciclo() {
-    if (!this.estado.simulacao.ativo || this.estado.simulacao.pausado) return;
+    // Impede duas leituras simultâneas do mesmo bueiro se um ciclo anterior
+    // ainda aguarda o banco/serviço de alertas.
+    if (this.cicloEmAndamento || !this.estado.simulacao.ativo || this.estado.simulacao.pausado) return;
+    this.cicloEmAndamento = true;
+    try {
     this.fatorRampa = Math.min(1, this.fatorRampa + 0.15);
     const ruido = () => (Math.random() - 0.5) * 0.8;
     const nivel = (alvo) => Math.round(Math.max(0, Math.min(100, alvo * this.fatorRampa + ruido())) * 10) / 10;
 
     await this.ingest.registrar({ bueiroId: 'bueiro_1', nivelPct: nivel(this.cenario.b1Alvo), origem: ORIGENS.SIMULADOR });
+    if (!this.estado.simulacao.ativo || this.estado.simulacao.pausado) return;
     await this.ingest.registrar({ bueiroId: 'bueiro_2', nivelPct: nivel(this.cenario.b2Alvo), origem: ORIGENS.SIMULADOR });
+    } finally {
+      this.cicloEmAndamento = false;
+    }
   }
 
   parar() {
