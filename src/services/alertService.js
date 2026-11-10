@@ -84,6 +84,11 @@ export class AlertService extends EventEmitter {
   }
 
   async encerrarSimulados() {
+    // Uma nova sessão de demonstração deve poder avisar novamente, sem
+    // herdar a faixa de atenção/crítico da simulação encerrada.
+    for (const identificador of this.faixasTestePrototipo.keys()) {
+      if (identificador.startsWith('demonstracao:')) this.faixasTestePrototipo.delete(identificador);
+    }
     for (const [chave, alerta] of this.abertos) {
       if (!alerta.simulado) continue;
       this.abertos.delete(chave);
