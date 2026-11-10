@@ -21,3 +21,6 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm test
       - run: npm run lint
+
+      - name: Benchmark isolado HTTP e WebSocket (somente localhost)
+        run: node scripts/benchmark-isolado.mjs
