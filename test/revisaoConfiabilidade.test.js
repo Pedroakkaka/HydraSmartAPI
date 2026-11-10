@@ -108,3 +108,30 @@ test('simulador não sobrepõe ciclos nem mistura bueiros enquanto ingestão agu
   assert.deepEqual(chamadas,['bueiro_1','bueiro_2']);
   assert.equal(sim.cicloEmAndamento,false);
 });
+
+test('alertas automáticos de B01 e B02 alcançam inscritos sem botão de teste', async () => {
+  const alertas = new AlertService({ repositorios:criarRepositoriosMemoria(), log });
+  const enviados=[];
+  const push = criarWebPush({
+    config, alertas, log,
+    repositorio:{listar:async()=>[{endpoint:'https://fcm.googleapis.com/receptor'}],remover:async()=>{}},
+    transmitir:async(_inscricao,mensagem)=>{ enviados.push(mensagem); return 201; }
+  });
+  const avaliar = (bueiroId,nivelPct,risco,canal='demonstracao',simulado=true) =>
+    alertas.avaliar({bueiroId,nomeBueiro:bueiroId,nivelPct,risco},{canal,simulado});
+  try {
+    await avaliar('bueiro_1',55,'atencao');
+    await avaliar('bueiro_1',58,'atencao');
+    await avaliar('bueiro_2',90,'critico');
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(enviados.length,2);
+    assert.ok(enviados.some(x=>x.bueiroId==='bueiro_1'));
+    assert.ok(enviados.some(x=>x.bueiroId==='bueiro_2'));
+    assert.ok(enviados.every(x=>x.tipo==='simulacao' && x.titulo.includes('NÃO É EMERGÊNCIA')));
+    await avaliar('bueiro_1',90,'critico','campo',false);
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(enviados.length,2);
+  } finally {
+    push.encerrar();
+  }
+});
