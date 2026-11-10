@@ -12,6 +12,7 @@ import { construirApp } from '../src/app.js';
 
 const NIVEIS = [10, 25, 50, 100, 200];
 const ITERACOES = 8;
+const DURACAO_CONTINUA_MS = 15000;
 const TEMPO_LIMITE_MS = 12000;
 const config = carregarConfig({
   NODE_ENV:'test', SERIAL_ENABLED:'false',
@@ -82,11 +83,22 @@ async function medirWs(base,usuarios,ctx){
   const inicio=performance.now();
   const lotes=await Promise.allSettled(Array.from({length:usuarios},()=>abrirWs(base.replace(/^http/,'ws')+'/ws')));
   const validos=lotes.filter(x=>x.status==='fulfilled').map(x=>x.value);
+  const recebeuAmbos = new Set();
+  for (const [i,v] of validos.entries()) {
+    v.socket.addEventListener('message', evento => {
+      try {
+        const msg = JSON.parse(evento.data);
+        if (msg.tipo === 'estado' &&
+            msg.dados?.canais?.demonstracao?.bueiro_1 &&
+            msg.dados?.canais?.demonstracao?.bueiro_2) recebeuAmbos.add(i);
+      } catch { /* descartar mensagem não JSON */ }
+    });
+  }
   // Simulação de dois sensores no mesmo servidor, sem hardware e sem HTTP público.
   ctx.simulador.parar();
   const inicioEventos=performance.now();
   await ctx.simulador.iniciar('tempestade_transbordo');
-  await dormir(350);
+  await dormir(700); // aguardar broadcast agendado (até 250 ms)
   const eventosMs=performance.now()-inicioEventos;
   await ctx.simulador.encerrar();
   for(const v of validos)v.socket.close();
@@ -94,10 +106,34 @@ async function medirWs(base,usuarios,ctx){
   return {
     conexoesSolicitadas:usuarios, conectadas:validos.length,
     falhas:usuarios-validos.length,
+    receberamAtualizacaoDosDoisBueiros:recebeuAmbos.size,
     p95ConexaoMs:arred(p95(validos.map(x=>x.latencia).sort((a,b)=>a-b))??0),
     cicloDoisBueirosMs:arred(eventosMs),
     duracaoSeg:arred((performance.now()-inicio)/1000)
   };
+}
+
+async function medirSustentacao(base, usuarios, duracaoMs) {
+  const latencias=[];
+  let erros=0;
+  const inicio=performance.now();
+  const ate=inicio+duracaoMs;
+  await Promise.all(Array.from({length:usuarios},async(_,i)=>{
+    while(performance.now()<ate){
+      const t=performance.now();
+      try{
+        const url=(i+latencias.length)%2===0?'/api/v1/health':'/api/v1/estado';
+        const resposta=await fetch(base+url,{signal:AbortSignal.timeout(TEMPO_LIMITE_MS)});
+        await resposta.arrayBuffer();
+        if(!resposta.ok)erros++;
+      }catch{erros++;}
+      latencias.push(performance.now()-t);
+      // Cada visitante gera no máximo ~2 requisições/segundo.
+      await dormir(500);
+    }
+  }));
+  return {usuariosSimultaneos:usuarios,duracaoSeg:arred((performance.now()-inicio)/1000),
+    ...resultado(latencias,erros,(performance.now()-inicio)/1000)};
 }
 
 let ctx,app;
@@ -118,9 +154,13 @@ try{
     console.log('RESULTADO_JSON',JSON.stringify(linha));
     if(http.erros>0||ws.falhas>0) console.warn('ATENÇÃO — erros nesta faixa',usuarios);
   }
-  const res={tipo:'local_isolado',data:new Date().toISOString(),resultados};
+  const sustentacao=await medirSustentacao(base,100,DURACAO_CONTINUA_MS);
+  console.log('SUSTENTACAO_JSON',JSON.stringify(sustentacao));
+  const res={tipo:'local_isolado',data:new Date().toISOString(),resultados,sustentacao};
   console.log('RELATORIO_COMPLETO_JSON',JSON.stringify(res));
   // Threshold: identificar qualquer erro. Não usar como atestado de capacidade em Render.
-  if(resultados.some(x=>x.http.erros>0||x.websocket.falhas>0))process.exitCode=1;
+  if(resultados.some(x=>x.http.erros>0 || x.websocket.falhas>0 ||
+    x.websocket.receberamAtualizacaoDosDoisBueiros!==x.websocket.conectadas) ||
+    sustentacao.erros>0)process.exitCode=1;
 }catch(err){console.error('FALHA_BENCHMARK',err.stack||err.message);process.exitCode=1;}
 finally{await app?.close();await ctx?.encerrar();}
