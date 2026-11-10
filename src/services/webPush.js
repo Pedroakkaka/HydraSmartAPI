@@ -116,7 +116,7 @@ export async function enviarPush(inscricao, mensagem, config, fetchImpl = fetch)
   }
 }
 
-export function criarWebPush({ config, repositorio, alertas, log }) {
+export function criarWebPush({ config, repositorio, alertas, log, transmitir = enviarPush }) {
   const ativo = configuracaoPushValida(config) && Boolean(repositorio);
   const fila = new Set();
   // Recibos do Service Worker: prova processamento, não leitura humana.
@@ -190,7 +190,7 @@ export function criarWebPush({ config, repositorio, alertas, log }) {
       try {
         const reciboToken = randomBytes(16).toString('hex');
         recibo.tokens.add(reciboToken);
-        const status = await enviarPush(inscricao, { ...mensagem, reciboToken }, config);
+        const status = await transmitir(inscricao, { ...mensagem, reciboToken }, config);
         if (status === 404 || status === 410) {
           resultado.recusadosGateway++;
           await repositorio.remover(inscricao.endpoint);
