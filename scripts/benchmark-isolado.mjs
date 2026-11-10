@@ -13,7 +13,6 @@ import { construirApp } from '../src/app.js';
 const NIVEIS = [10, 25, 50, 100, 200];
 const ITERACOES = 8;
 const TEMPO_LIMITE_MS = 12000;
-const chaves = { 'x-operator-key':'chave-local-so-benchmark' };
 const config = carregarConfig({
   NODE_ENV:'test', SERIAL_ENABLED:'false',
   OPERATOR_API_KEY:'chave-local-so-benchmark',
@@ -69,7 +68,7 @@ async function abrirWs(url) {
           fechado=true;clearTimeout(limite);
           resolve({socket:ws,latencia:performance.now()-t});
         }
-      }catch{}
+      }catch { /* mensagem não JSON, aguarda próximo evento válido */ }
     });
     ws.addEventListener('error',()=>{
       if(!fechado){fechado=true;clearTimeout(limite);reject(new Error('erro WebSocket'));}
