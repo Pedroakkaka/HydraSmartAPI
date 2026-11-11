@@ -71,8 +71,8 @@ export default async function rotasLeituras(app, { ctx }) {
   app.post('/leituras/prototipo', {
     schema: {
       tags: ['Leituras'],
-      summary: 'Ponte experimental do Arduino USB local; requer X-Prototype-Key e NÃO é leitura de campo',
-      headers: { type: 'object', properties: { 'x-prototype-key': { type: 'string' } } },
+      summary: 'Ponte experimental do Arduino USB; aceita chave experimental ou chave autenticada de operador; NÃO é leitura de campo',
+      headers: { type: 'object', properties: { 'x-prototype-key': { type: 'string' }, 'x-operator-key': { type: 'string' } } },
       body: {
         type: 'object',
         required: ['bueiroId'],
@@ -86,10 +86,18 @@ export default async function rotasLeituras(app, { ctx }) {
       }
     }
   }, async (req, reply) => {
-    const esperada = ctx.config.prototypeIngestApiKey;
-    if (!esperada) return reply.code(503).send({ erro: 'Ponte experimental desativada: configure PROTOTYPE_INGEST_API_KEY no servidor.' });
-    if (!chaveConfere(req.headers['x-prototype-key'], esperada)) {
-      return reply.code(401).send({ erro: 'Credencial da ponte experimental inválida.' });
+    const chavePrototipo = ctx.config.prototypeIngestApiKey;
+    const chaveOperador = ctx.config.operatorApiKey;
+    if (!chavePrototipo && !chaveOperador) {
+      return reply.code(503).send({ erro: 'Ponte experimental sem credencial configurada no servidor.' });
+    }
+    // Ambos os caminhos são privados. Operador autenticado pode publicar
+    // leituras experimentais sem precisar de uma segunda chave desconhecida.
+    // Nunca aceitar uma chave vazia nem misturar o canal com leituras de campo.
+    const autorizada = (chavePrototipo && chaveConfere(req.headers['x-prototype-key'], chavePrototipo))
+      || (chaveOperador && chaveConfere(req.headers['x-operator-key'], chaveOperador));
+    if (!autorizada) {
+      return reply.code(401).send({ erro: 'Chave experimental ou chave de operador inválida.' });
     }
     if ((req.body.distanciaCm === undefined) === (req.body.nivelPct === undefined)) {
       return reply.code(400).send({ erro: 'Informe apenas um dos campos: distanciaCm ou nivelPct.' });
